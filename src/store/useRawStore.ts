@@ -5,10 +5,11 @@ export interface User {
   username: string;
 }
 
-export interface AuthResult {
-  ok: boolean;
-  error?: string;
-  channels?: string[];
+export interface StytchSession {
+  authenticated: boolean;
+  userId?: string;
+  email?: string;
+  sessionToken?: string;
 }
 
 export interface PollOption {
@@ -160,6 +161,7 @@ function toErrorMessage(error: unknown, fallback: string): string {
 
 export function useRawStore() {
   const [user, setUser] = useState<User | null>(null);
+  const [stytchSession, setStytchSession] = useState<StytchSession | null>(null);
   const [polls, setPolls] = useState<Poll[]>(INITIAL_POLLS);
   const [votedPolls, setVotedPolls] = useState<Set<string>>(new Set());
   const [showSignup, setShowSignup] = useState(false);
@@ -170,7 +172,7 @@ export function useRawStore() {
   const [onboardingSelectedCommunityId, setOnboardingSelectedCommunityId] = useState<string | null>(null);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
-  const isLoggedIn = user !== null;
+  const isLoggedIn = user !== null || (stytchSession?.authenticated ?? false);
 
   const syncFromBootstrap = useCallback((payload: BootstrapResponse) => {
     setUser(payload.user);
@@ -264,6 +266,7 @@ export function useRawStore() {
   const logout = useCallback(() => {
     // Backend disabled — clear user locally
     setUser(null);
+    setStytchSession(null);
   }, []);
 
   const markOnboardingPollAnswered = useCallback((pollId: string) => {
@@ -286,9 +289,22 @@ export function useRawStore() {
     setOnboardingStep("ready");
   }, []);
 
+  const setSyncStytchSession = useCallback((session: StytchSession | null) => {
+    setStytchSession(session);
+    // Optionally create a user object from Stytch email
+    if (session?.authenticated && session?.email) {
+      setUser({
+        id: session.userId || `stytch-${session.email}`,
+        username: session.email.split('@')[0],
+      });
+    }
+  }, []);
+
   return {
     user,
     isLoggedIn,
+    stytchSession,
+    setStytchSession: setSyncStytchSession,
     polls,
     votedPolls,
     freeVotesUsed,

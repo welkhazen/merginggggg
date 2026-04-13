@@ -8,6 +8,7 @@ import {
   ThumbsUp,
   MessageCircle,
 } from "lucide-react";
+import { DiagonalSplitProgress } from "@/components/ui/diagonal-split-progress";
 
 interface PollSectionProps {
   polls: Poll[];
@@ -36,6 +37,8 @@ const mockComments: Record<string, { user: string; text: string; time: string; l
 function PollPhoneContent({
   poll,
   hasVoted,
+  selectedOptionId,
+  submittedOptionId,
   onVote,
   showNavButtons,
   canGoPrev,
@@ -47,6 +50,8 @@ function PollPhoneContent({
 }: {
   poll: Poll;
   hasVoted: boolean;
+  selectedOptionId?: string;
+  submittedOptionId?: string;
   onVote: (optionId: string) => void;
   showNavButtons: boolean;
   canGoPrev: boolean;
@@ -60,8 +65,31 @@ function PollPhoneContent({
   const comments = mockComments[poll.id] || [];
   const yesOption = poll.options.find((o) => o.text === "Yes");
   const noOption = poll.options.find((o) => o.text === "No");
-  const yesPct = yesOption && totalVotes > 0 ? Math.round((yesOption.votes / totalVotes) * 100) : 0;
-  const noPct = noOption && totalVotes > 0 ? Math.round((noOption.votes / totalVotes) * 100) : 0;
+  const adjustedYesVotes = (() => {
+    if (!yesOption) return 0;
+
+    let value = yesOption.votes;
+    if (submittedOptionId && selectedOptionId && submittedOptionId !== selectedOptionId) {
+      if (submittedOptionId === yesOption.id) value -= 1;
+      if (selectedOptionId === yesOption.id) value += 1;
+    }
+    return Math.max(0, value);
+  })();
+
+  const adjustedNoVotes = (() => {
+    if (!noOption) return 0;
+
+    let value = noOption.votes;
+    if (submittedOptionId && selectedOptionId && submittedOptionId !== selectedOptionId) {
+      if (submittedOptionId === noOption.id) value -= 1;
+      if (selectedOptionId === noOption.id) value += 1;
+    }
+    return Math.max(0, value);
+  })();
+
+  const adjustedTotalVotes = adjustedYesVotes + adjustedNoVotes;
+  const yesPct = adjustedTotalVotes > 0 ? Math.round((adjustedYesVotes / adjustedTotalVotes) * 100) : 0;
+  const noPct = adjustedTotalVotes > 0 ? 100 - yesPct : 0;
 
   return (
     <div className="bg-black px-5 py-4 min-h-[480px] flex flex-col">
@@ -127,34 +155,26 @@ function PollPhoneContent({
           </>
         ) : (
           <>
-            {/* Results in the same box style */}
-            <div className="mt-5 space-y-3">
-              {/* Yes result */}
-              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/60">
-                <div
-                  className="absolute inset-y-0 left-0 bg-[#F1C42D]/15 transition-all duration-700"
-                  style={{ width: `${yesPct}%` }}
-                />
-                <div className="relative flex items-center justify-between px-5 py-3.5">
-                  <span className="text-sm font-semibold text-white">Yes</span>
-                  <span className="text-sm font-bold text-[#F1C42D]">{yesPct}%</span>
-                </div>
-              </div>
-              {/* No result */}
-              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/60">
-                <div
-                  className="absolute inset-y-0 left-0 bg-white/10 transition-all duration-700"
-                  style={{ width: `${noPct}%` }}
-                />
-                <div className="relative flex items-center justify-between px-5 py-3.5">
-                  <span className="text-sm font-semibold text-white">No</span>
-                  <span className="text-sm font-bold text-white/70">{noPct}%</span>
-                </div>
-              </div>
-              <p className="text-[9px] text-white/20 text-center pt-1">
-                {totalVotes.toLocaleString()} anonymous responses
-              </p>
-            </div>
+            {/* Combined proportional results: larger percentage takes more space */}
+            <DiagonalSplitProgress
+              leftLabel="Yes"
+              rightLabel="No"
+              leftValue={yesPct}
+              rightValue={noPct}
+              leftColor="#050505"
+              rightColor="#8b6d08"
+              leftTextColor="#ffffff"
+              rightTextColor="#f3d24f"
+              leftActive={selectedOptionId === yesOption?.id}
+              rightActive={selectedOptionId === noOption?.id}
+              onLeftClick={yesOption ? () => onVote(yesOption.id) : undefined}
+              onRightClick={noOption ? () => onVote(noOption.id) : undefined}
+              className="mt-6 mx-auto w-full max-w-[320px]"
+            />
+
+            <p className="mt-3 text-[9px] text-white/25 text-center">
+              {adjustedTotalVotes.toLocaleString()} anonymous responses
+            </p>
           </>
         )}
       </div>
@@ -229,12 +249,30 @@ export function PollSection({
   onSignupClick,
 }: PollSectionProps) {
   const [currentPoll, setCurrentPoll] = useState(0);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const [submittedOptions, setSubmittedOptions] = useState<Record<string, string>>({});
 
   const goNext = () => setCurrentPoll((p) => Math.min(p + 1, polls.length - 1));
   const goPrev = () => setCurrentPoll((p) => Math.max(p - 1, 0));
 
-  const currentHasVoted = votedPolls.has(polls[currentPoll].id);
+  const currentPollId = polls[currentPoll].id;
+  const currentHasVoted = votedPolls.has(currentPollId) || Boolean(selectedOptions[currentPollId]);
   const showSignupGate = !isLoggedIn && freeVotesUsed >= 3;
+
+  const handleVote = (pollId: string, optionId: string) => {
+    setSelectedOptions((previous) => ({
+      ...previous,
+      [pollId]: optionId,
+    }));
+
+    if (!submittedOptions[pollId]) {
+      onVote(pollId, optionId);
+      setSubmittedOptions((previous) => ({
+        ...previous,
+        [pollId]: optionId,
+      }));
+    }
+  };
 
   return (
     <section id="polls" className="relative py-28 px-6">
@@ -282,7 +320,9 @@ export function PollSection({
                 <PollPhoneContent
                   poll={polls[currentPoll]}
                   hasVoted={currentHasVoted}
-                  onVote={(optionId) => onVote(polls[currentPoll].id, optionId)}
+                  selectedOptionId={selectedOptions[currentPollId]}
+                  submittedOptionId={submittedOptions[currentPollId]}
+                  onVote={(optionId) => handleVote(currentPollId, optionId)}
                   showNavButtons={currentHasVoted}
                   canGoPrev={currentPoll > 0}
                   canGoNext={currentPoll < polls.length - 1}

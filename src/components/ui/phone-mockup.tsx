@@ -9,45 +9,48 @@ interface PhoneMockupProps {
 
 export function PhoneMockup({ children, className = "", showStatusBar = true }: PhoneMockupProps) {
   return (
-    <div className={`relative mx-auto w-[280px] ${className}`}>
-      {/* Outer frame */}
-      <div className="rounded-[2.8rem] border-[3px] border-[#2a2a2e] bg-[#0a0a0a] p-[6px] shadow-2xl shadow-black/60">
-        {/* Inner bezel */}
-        <div className="rounded-[2.4rem] bg-[#111113] overflow-hidden">
-          {/* Dynamic Island */}
-          <div className="relative h-8 flex items-center justify-center">
-            <div className="h-[22px] w-[90px] rounded-full bg-[#0a0a0a] border border-[#1a1a1e]" />
-          </div>
+    <div className={`relative mx-auto w-[340px] h-[720px] ${className}`}>
+      {/* Outer frame - iPhone bezel */}
+      <div className="rounded-[4rem] border-[10px] border-black bg-black p-[3px] shadow-2xl shadow-black/80 h-full">
+        {/* Inner bezel color ring */}
+        <div className="rounded-[3.8rem] bg-gradient-to-b from-gray-900 to-black p-[2px] h-full">
+          {/* Screen area with rounded corners */}
+          <div className="rounded-[3.6rem] bg-black overflow-hidden flex flex-col h-full">
+            {/* Dynamic Island */}
+            <div className="relative h-6 flex items-center justify-center bg-black pt-1">
+              <div className="h-[26px] w-[120px] rounded-[26px] bg-black border-[0.5px] border-gray-800 shadow-lg" />
+            </div>
 
-          {/* Status bar */}
-          {showStatusBar && (
-            <div className="flex items-center justify-between px-6 pb-1">
-              <span className="text-[9px] font-semibold text-white/70">10:35</span>
-              <div className="flex items-center gap-1">
-                {/* Signal bars */}
-                <div className="flex items-end gap-[1px]">
-                  <div className="w-[3px] h-[4px] rounded-[0.5px] bg-white/70" />
-                  <div className="w-[3px] h-[6px] rounded-[0.5px] bg-white/70" />
-                  <div className="w-[3px] h-[8px] rounded-[0.5px] bg-white/70" />
-                  <div className="w-[3px] h-[10px] rounded-[0.5px] bg-white/70" />
-                </div>
-                <span className="text-[8px] text-white/50 ml-0.5">5G</span>
-                {/* Battery */}
-                <div className="ml-1 w-[18px] h-[8px] rounded-[2px] border border-white/40 flex items-center p-[1px]">
-                  <div className="h-full w-3/4 rounded-[1px] bg-white/70" />
+            {/* Status bar */}
+            {showStatusBar && (
+              <div className="flex items-center justify-between px-5 py-0.5 bg-gradient-to-b from-slate-50 to-slate-50">
+                <span className="text-[11px] font-semibold text-slate-900">9:41</span>
+                <div className="flex items-center gap-1">
+                  {/* Signal bars */}
+                  <div className="flex items-end gap-[0.5px]">
+                    <div className="w-[2px] h-[3px] rounded-[0.5px] bg-slate-900" />
+                    <div className="w-[2px] h-[5px] rounded-[0.5px] bg-slate-900" />
+                    <div className="w-[2px] h-[7px] rounded-[0.5px] bg-slate-900" />
+                    <div className="w-[2px] h-[9px] rounded-[0.5px] bg-slate-900" />
+                  </div>
+                  <span className="text-[8px] text-slate-600 ml-0.5 font-medium">5G</span>
+                  {/* Battery */}
+                  <div className="ml-1 w-[20px] h-[9px] rounded-[2.5px] border-[0.5px] border-slate-900 flex items-center p-[1px]">
+                    <div className="h-full w-4/5 rounded-[1px] bg-slate-900" />
+                  </div>
                 </div>
               </div>
+            )}
+
+            {/* Screen content - proper iPhone proportions */}
+            <div className="flex-1 overflow-hidden">
+              {children}
             </div>
-          )}
 
-          {/* Screen content */}
-          <div className="min-h-[480px]">
-            {children}
-          </div>
-
-          {/* Home indicator */}
-          <div className="flex items-center justify-center py-2">
-            <div className="h-[4px] w-[100px] rounded-full bg-white/20" />
+            {/* Home indicator */}
+            <div className="flex items-center justify-center py-2 bg-gradient-to-b from-slate-100 to-slate-50">
+              <div className="h-1 w-32 rounded-full bg-slate-900" />
+            </div>
           </div>
         </div>
       </div>

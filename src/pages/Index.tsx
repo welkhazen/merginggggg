@@ -11,6 +11,7 @@ import { FinalCTA } from "@/components/landing/FinalCTA";
 import { SignupModal } from "@/components/landing/SignupModal";
 import { OnboardingJourney } from "@/components/onboarding/OnboardingJourney";
 import { useHostMode } from "@/hooks/use-host-mode";
+import { useSyncStytchAuth } from "@/hooks/useSyncStytchAuth";
 import Dashboard from "@/pages/Dashboard";
 import { useRawStore } from "@/store/useRawStore";
 
@@ -40,6 +41,9 @@ const Index = () => {
     logout,
   } = useRawStore();
   const { hostname, isMyRawApp, isTheRawMe } = useHostMode();
+  
+  // Sync Stytch authentication with the store
+  useSyncStytchAuth();
 
   useEffect(() => {
     if (!isLoggedIn || !user || !isTheRawMe || typeof window === "undefined") {

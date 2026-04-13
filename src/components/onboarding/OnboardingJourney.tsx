@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { AvatarFigure, getAvatarTheme } from "@/components/ui/avatar-figure";
+import { PhoneMockup } from "@/components/ui/phone-mockup";
+import { SwipeablePollCard } from "./SwipeablePollCard";
 import type { OnboardingStep, Poll, User } from "@/store/useRawStore";
+import type { Comment } from "./PollComments";
 
 type OnboardingPoll = {
   id: string;
@@ -137,11 +140,26 @@ export function OnboardingJourney({
 }: OnboardingJourneyProps) {
   const onboardingPolls = useMemo(() => toOnboardingPolls(polls), [polls]);
   const [pollSelections, setPollSelections] = useState<Record<string, string>>({});
+  const [pollComments, setPollComments] = useState<Record<string, Comment[]>>({});
+  const [pollStats, setPollStats] = useState<Record<string, Record<string, number>>>({});
+  const [currentPollIndex, setCurrentPollIndex] = useState(0);
   const answeredCount = onboardingPolls.filter((poll) => onboardingAnsweredPollIds.has(poll.id)).length;
 
   const canContinueFromAvatar = avatarLevel >= 1;
   const canContinueFromPolls = answeredCount >= onboardingPolls.length;
   const canContinueFromCommunities = Boolean(selectedCommunityId);
+
+  // Initialize poll stats with mock data
+  useMemo(() => {
+    const stats: Record<string, Record<string, number>> = {};
+    onboardingPolls.forEach((poll) => {
+      stats[poll.id] = {};
+      poll.options.forEach((option) => {
+        stats[poll.id][option] = Math.floor(Math.random() * 1000) + 50;
+      });
+    });
+    setPollStats(stats);
+  }, [onboardingPolls]);
 
   const goToNextStep = () => {
     onSetOnboardingStep(getNextStep(onboardingStep));
@@ -191,34 +209,162 @@ export function OnboardingJourney({
                 Your avatar is your public signal. You can evolve it later, but choose your starting form now.
               </p>
 
-              <div className="mt-6 grid gap-6 lg:grid-cols-[220px_1fr] lg:items-center">
-                <div className="rounded-2xl border border-raw-border/30 bg-raw-black/50 p-5">
-                  <div className="flex justify-center">
-                    <AvatarFigure level={avatarLevel} size="lg" selected />
+              <div className="mt-8 grid gap-8 grid-cols-2 items-center">
+                {/* Left: Avatar Selector Grid (3 rows) */}
+                <div className="flex flex-col items-center justify-center min-w-0">
+                  <div className="space-y-6">
+                    {/* Row 1: Levels 1-3 */}
+                    <div className="flex items-center justify-center gap-4">
+                      {Array.from({ length: 3 }, (_, i) => i + 1).map((lvl) => (
+                        <button
+                          key={lvl}
+                          onClick={() => onAvatarLevelChange(lvl)}
+                          className="flex flex-col items-center gap-2 group transition-transform hover:scale-105"
+                        >
+                          <div
+                            className={`rounded-full p-1 transition-all ${
+                              lvl === avatarLevel
+                                ? "border-2 border-raw-gold ring-2 ring-raw-gold/30"
+                                : "border-2 border-raw-border hover:border-raw-gold/50"
+                            }`}
+                          >
+                            <AvatarFigure level={lvl} size="lg" selected={lvl === avatarLevel} />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Row 2: Levels 4-6 */}
+                    <div className="flex items-center justify-center gap-4">
+                      {Array.from({ length: 3 }, (_, i) => i + 4).map((lvl) => (
+                        <button
+                          key={lvl}
+                          onClick={() => onAvatarLevelChange(lvl)}
+                          className="flex flex-col items-center gap-2 group transition-transform hover:scale-105"
+                        >
+                          <div
+                            className={`rounded-full p-1 transition-all ${
+                              lvl === avatarLevel
+                                ? "border-2 border-raw-gold ring-2 ring-raw-gold/30"
+                                : "border-2 border-raw-border hover:border-raw-gold/50"
+                            }`}
+                          >
+                            <AvatarFigure level={lvl} size="lg" selected={lvl === avatarLevel} />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Row 3: Levels 7-9 */}
+                    <div className="flex items-center justify-center gap-4">
+                      {Array.from({ length: 3 }, (_, i) => i + 7).map((lvl) => (
+                        <button
+                          key={lvl}
+                          onClick={() => onAvatarLevelChange(lvl)}
+                          className="flex flex-col items-center gap-2 group transition-transform hover:scale-105"
+                        >
+                          <div
+                            className={`rounded-full p-1 transition-all ${
+                              lvl === avatarLevel
+                                ? "border-2 border-raw-gold ring-2 ring-raw-gold/30"
+                                : "border-2 border-raw-border hover:border-raw-gold/50"
+                            }`}
+                          >
+                            <AvatarFigure level={lvl} size="lg" selected={lvl === avatarLevel} />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <p className="mt-4 text-center text-xs uppercase tracking-[0.2em] text-raw-gold">Level {avatarLevel}</p>
-                  <p className="mt-1 text-center text-xs text-raw-silver/45">{avatarTheme.name}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map((level) => (
-                    <button
-                      key={level}
-                      onClick={() => onAvatarLevelChange(level)}
-                      className={`rounded-2xl border px-3 py-3 transition-all ${
-                        level === avatarLevel
-                          ? "border-raw-gold/55 bg-raw-gold/10"
-                          : "border-raw-border/30 bg-raw-black/30 hover:border-raw-gold/25"
-                      }`}
-                    >
-                      <div className="flex justify-center">
-                        <AvatarFigure level={level} size="sm" selected={level === avatarLevel} />
+                {/* Right: Phone Mockup */}
+                <div className="flex flex-col items-center justify-center">
+                  <PhoneMockup>
+                    <div className="bg-gradient-to-b from-slate-50 to-slate-100 px-3 py-2 flex flex-col h-full overflow-hidden">
+                      {/* App Grid - 5 column iOS layout */}
+                      <div className="grid grid-cols-5 gap-3 px-2 py-3 flex-1 overflow-y-auto auto-rows-max">
+                        {/* FaceTime */}
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="w-full aspect-square rounded-[22px] bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-4xl shadow-md">📹</div>
+                          <span className="text-[7px] text-slate-600 font-medium text-center line-clamp-1">FaceTime</span>
+                        </div>
+
+                        {/* Calendar */}
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="w-full aspect-square rounded-[22px] bg-white border border-slate-200 flex items-center justify-center font-bold text-2xl shadow-md">23</div>
+                          <span className="text-[7px] text-slate-600 font-medium text-center line-clamp-1">Calendar</span>
+                        </div>
+
+                        {/* Camera */}
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="w-full aspect-square rounded-[22px] bg-gradient-to-br from-amber-300 to-orange-500 flex items-center justify-center text-4xl shadow-md">📷</div>
+                          <span className="text-[7px] text-slate-600 font-medium text-center line-clamp-1">Camera</span>
+                        </div>
+
+                        {/* Clock */}
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="w-full aspect-square rounded-[22px] bg-slate-800 flex items-center justify-center text-4xl shadow-md">🕐</div>
+                          <span className="text-[7px] text-slate-600 font-medium text-center line-clamp-1">Clock</span>
+                        </div>
+
+                        {/* Weather */}
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="w-full aspect-square rounded-[22px] bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-3xl shadow-md">☁️</div>
+                          <span className="text-[7px] text-slate-600 font-medium text-center line-clamp-1">Weather</span>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="w-full aspect-square rounded-[22px] bg-yellow-400 flex items-center justify-center text-4xl shadow-md">📝</div>
+                          <span className="text-[7px] text-slate-600 font-medium text-center line-clamp-1">Notes</span>
+                        </div>
+
+                        {/* Reminders */}
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="w-full aspect-square rounded-[22px] bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-4xl shadow-md">✓</div>
+                          <span className="text-[7px] text-slate-600 font-medium text-center line-clamp-1">Reminders</span>
+                        </div>
+
+                        {/* Stocks */}
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="w-full aspect-square rounded-[22px] bg-slate-900 flex items-center justify-center text-3xl shadow-md">📈</div>
+                          <span className="text-[7px] text-slate-600 font-medium text-center line-clamp-1">Stocks</span>
+                        </div>
+
+                        {/* Maps */}
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="w-full aspect-square rounded-[22px] bg-gradient-to-br from-teal-400 to-green-500 flex items-center justify-center text-4xl shadow-md">🗺️</div>
+                          <span className="text-[7px] text-slate-600 font-medium text-center line-clamp-1">Maps</span>
+                        </div>
+
+                        {/* Your raW Avatar - 2x2 Featured App */}
+                        <div className="col-span-2 row-span-2 flex flex-col items-center justify-center gap-2">
+                          <div
+                            className="w-full aspect-square rounded-[28px] flex items-center justify-center shadow-xl border-2 border-white relative overflow-hidden"
+                            style={{ background: avatarTheme.bg }}
+                          >
+                            <div
+                              className="absolute inset-0 opacity-50 blur-2xl"
+                              style={{ background: avatarTheme.glow !== "none" ? avatarTheme.glow : avatarTheme.ring }}
+                            />
+                            <div className="relative z-10 scale-100">
+                              <AvatarFigure level={avatarLevel} size="xl" />
+                            </div>
+                          </div>
+                          <span className="text-[9px] text-slate-600 font-bold text-center">raW</span>
+                        </div>
                       </div>
-                      <p className={`mt-1 text-[10px] uppercase tracking-[0.15em] ${level === avatarLevel ? "text-raw-gold" : "text-raw-silver/45"}`}>
-                        Lvl {level}
-                      </p>
-                    </button>
-                  ))}
+
+                      {/* Dock */}
+                      <div className="mt-1 mx-1 bg-white/60 backdrop-blur rounded-2xl py-1 px-1 flex gap-1 justify-center shadow-lg border border-white/40">
+                        <div className="w-9 h-9 rounded-lg bg-green-500 flex items-center justify-center text-lg shadow">📞</div>
+                        <div className="w-9 h-9 rounded-lg bg-blue-500 flex items-center justify-center text-lg shadow">🧭</div>
+                        <div className="w-9 h-9 rounded-lg bg-green-600 flex items-center justify-center text-lg shadow">💬</div>
+                        <div className="w-9 h-9 rounded-lg bg-red-500 flex items-center justify-center text-lg shadow">🎵</div>
+                      </div>
+                    </div>
+                  </PhoneMockup>
                 </div>
               </div>
 
@@ -240,7 +386,7 @@ export function OnboardingJourney({
                 <div>
                   <h2 className="font-display text-xl tracking-wide text-raw-text">2. Answer 5 launch polls</h2>
                   <p className="mt-2 text-sm text-raw-silver/45">
-                    Select one answer per question. All 5 are required to continue.
+                    One question at a time. Swipe or use buttons to navigate through all 5 polls.
                   </p>
                 </div>
                 <p className="rounded-full border border-raw-border/40 px-3 py-1 text-xs text-raw-gold/75">
@@ -248,50 +394,84 @@ export function OnboardingJourney({
                 </p>
               </div>
 
-              <div className="mt-6 space-y-4">
-                {onboardingPolls.map((poll, index) => {
-                  const selectedOption = pollSelections[poll.id];
-                  const isAnswered = onboardingAnsweredPollIds.has(poll.id);
+              {/* Single Poll Card */}
+              <div className="mt-8">
+                {onboardingPolls.length > 0 && (
+                  <div className="max-w-2xl">
+                    {(() => {
+                      const poll = onboardingPolls[currentPollIndex];
+                      const selectedOption = pollSelections[poll.id];
+                      const isAnswered = onboardingAnsweredPollIds.has(poll.id);
+                      const pollStatData = pollStats[poll.id] || {};
 
-                  return (
-                    <div key={poll.id} className="rounded-2xl border border-raw-border/30 bg-raw-black/35 p-4">
-                      <p className="text-sm text-raw-text">
-                        {index + 1}. {poll.question}
-                      </p>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {poll.options.map((option) => (
-                          <button
-                            key={option}
-                            onClick={() => {
-                              setPollSelections((previous) => ({ ...previous, [poll.id]: option }));
+                      return (
+                        <div>
+                          <p className="text-xs text-raw-silver/50 mb-4 font-medium uppercase tracking-[0.12em]">
+                            Question {currentPollIndex + 1} of {onboardingPolls.length}
+                          </p>
+                          <SwipeablePollCard
+                            id={poll.id}
+                            question={poll.question}
+                            options={poll.options}
+                            selectedOption={selectedOption}
+                            isAnswered={isAnswered}
+                            totalResponses={Object.values(pollStatData).reduce((a, b) => a + b, 0)}
+                            responseStats={pollStatData}
+                            comments={pollComments[poll.id] || []}
+                            onSwipe={(option) => {
+                              setPollSelections((prev) => ({ ...prev, [poll.id]: option }));
                               onMarkPollAnswered(poll.id);
                             }}
-                            className={`rounded-xl border px-3 py-2 text-left text-xs transition-all ${
-                              selectedOption === option
-                                ? "border-raw-gold/55 bg-raw-gold/10 text-raw-gold"
-                                : "border-raw-border/30 bg-raw-black/30 text-raw-silver/65 hover:border-raw-gold/25"
-                            }`}
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                      {isAnswered && (
-                        <p className="mt-2 text-[11px] text-emerald-300/85">Answer captured</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                            onAddComment={(content) => {
+                              const newComment: Comment = {
+                                id: `${poll.id}-${Date.now()}`,
+                                author: user.username,
+                                avatar: avatarLevel,
+                                content,
+                                timestamp: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+                                likes: 0,
+                                replies: [],
+                                isAnonymous: Math.random() > 0.7,
+                              };
+                              setPollComments((prev) => ({
+                                ...prev,
+                                [poll.id]: [...(prev[poll.id] || []), newComment],
+                              }));
+                            }}
+                          />
 
-              <div className="mt-8 flex justify-end">
-                <button
-                  onClick={goToNextStep}
-                  disabled={!canContinueFromPolls}
-                  className="rounded-xl bg-raw-gold px-5 py-2.5 text-sm font-semibold text-raw-black transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Next: Communities
-                </button>
+                          {/* Navigation Buttons */}
+                          <div className="mt-6 flex gap-3">
+                            <button
+                              onClick={() => setCurrentPollIndex(Math.max(0, currentPollIndex - 1))}
+                              disabled={currentPollIndex === 0}
+                              className="flex-1 rounded-lg border border-raw-border/30 bg-raw-black/20 px-4 py-2.5 text-xs font-medium text-raw-silver/70 hover:border-raw-gold/35 hover:text-raw-gold/75 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              ← Previous
+                            </button>
+
+                            {currentPollIndex < onboardingPolls.length - 1 ? (
+                              <button
+                                onClick={() => setCurrentPollIndex(Math.min(onboardingPolls.length - 1, currentPollIndex + 1))}
+                                className="flex-1 rounded-lg border border-raw-border/30 bg-raw-black/20 px-4 py-2.5 text-xs font-medium text-raw-silver/70 hover:border-raw-gold/35 hover:text-raw-gold/75 transition-all"
+                              >
+                                Next →
+                              </button>
+                            ) : (
+                              <button
+                                onClick={goToNextStep}
+                                disabled={!canContinueFromPolls}
+                                className="flex-1 rounded-lg bg-raw-gold px-4 py-2.5 text-xs font-semibold text-raw-black transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Complete →
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             </section>
           )}
