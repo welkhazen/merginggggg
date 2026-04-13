@@ -1,0 +1,265 @@
+﻿import type { Request } from "express";
+import { Router } from "express";
+import rateLimit from "express-rate-limit";
+import { z } from "zod";
+import { audit } from "../lib/audit";
+import { createUser, findUserByUsername, getAnonymousVotes, phoneHashExists, usernameExists } from "../lib/store";
+import { hashPassword, verifyPassword } from "../lib/password";
+import { hashPhone, normalizePhone } from "../lib/phoneHash";
+import { sendOtp, verifyOtp } from "../lib/twilio";
+import type { AuthSessionData } from "../types";
+
+type LoginAttempt = {
+  failures: number;
+  lockedUntil: number;
+};
+
+const loginAttempts = new Map<string, LoginAttempt>();
+const authErrorMessage = "Invalid username or password.";
+const usernameRegex = /^[a-zA-Z0-9._-]{3,24}$/;
+
+const signupRequestSchema = z.object({
+  username: z.string().regex(usernameRegex),
+  password: z
+    .string()
+    .min(8)
+    .max(128)
+    .refine((value) => /[A-Z]/.test(value), "missing uppercase")
+    .refine((value) => /[a-z]/.test(value), "missing lowercase")
+    .refine((value) => /\d/.test(value), "missing number")
+    .refine((value) => /[^A-Za-z0-9]/.test(value), "missing symbol"),
+  phone: z.string().min(8).max(24),
+});
+
+const loginSchema = z.object({
+  username: z.string().regex(usernameRegex),
+  password: z.string().min(8).max(128),
+});
+
+const codeSchema = z.object({
+  code: z.string().regex(/^\d{6}$/),
+});
+
+const signupLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Try again later." },
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Try again later." },
+});
+
+type SignupRateEntry = {
+  count: number;
+  resetAt: number;
+};
+
+const signupByPhone = new Map<string, SignupRateEntry>();
+
+function getSessionData(req: Request): AuthSessionData {
+  return req.session as unknown as AuthSessionData;
+}
+
+async function regenerateSession(session: { regenerate: (callback: (err: unknown) => void) => void }): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    session.regenerate((err: unknown) => (err ? reject(err) : resolve()));
+  });
+}
+
+function getAttemptKey(username: string, ip: string): string {
+  return `${username.toLowerCase()}|${ip}`;
+}
+
+function isLocked(attempt: LoginAttempt | undefined): boolean {
+  return Boolean(attempt && attempt.lockedUntil > Date.now());
+}
+
+function registerFailure(key: string) {
+  const attempt = loginAttempts.get(key) ?? { failures: 0, lockedUntil: 0 };
+  attempt.failures += 1;
+
+  if (attempt.failures >= 5) {
+    attempt.lockedUntil = Date.now() + 15 * 60 * 1000;
+    attempt.failures = 0;
+  }
+
+  loginAttempts.set(key, attempt);
+}
+
+function clearFailures(key: string) {
+  loginAttempts.delete(key);
+}
+
+function isPhoneRateLimited(phoneHash: string): boolean {
+  const entry = signupByPhone.get(phoneHash);
+  if (!entry) return false;
+  if (Date.now() > entry.resetAt) {
+    signupByPhone.delete(phoneHash);
+    return false;
+  }
+  return entry.count >= 3;
+}
+
+function incrementPhoneSendCount(phoneHash: string): void {
+  const entry = signupByPhone.get(phoneHash);
+  if (!entry || Date.now() > entry.resetAt) {
+    signupByPhone.set(phoneHash, { count: 1, resetAt: Date.now() + 10 * 60 * 1000 });
+  } else {
+    entry.count += 1;
+  }
+}
+
+export const authRouter = Router();
+
+authRouter.post("/signup/request-otp", signupLimiter, async (req, res) => {
+  const parsed = signupRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Unable to start signup." });
+  }
+
+  const { username, password, phone } = parsed.data;
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) {
+    return res.status(400).json({ error: "Please enter a valid phone number with country code, e.g. +447911123456." });
+  }
+
+  if (usernameExists(username)) {
+    return res.status(409).json({ error: "That username already exists." });
+  }
+
+  const phoneHash = hashPhone(normalizedPhone);
+  if (phoneHashExists(phoneHash)) {
+    return res.status(409).json({ error: "That phone number is already in use." });
+  }
+
+  if (isPhoneRateLimited(phoneHash)) {
+    audit("auth.signup.rate_limited", { username, ip: req.ip }, "warn");
+    return res.status(429).json({ error: "Too many verification requests. Try again in 10 minutes." });
+  }
+
+  incrementPhoneSendCount(phoneHash);
+  const result = await sendOtp(normalizedPhone);
+  if (!result.ok) {
+    audit("auth.signup.otp_send_failed", { username, ip: req.ip, reason: result.error }, "warn");
+    return res.status(502).json({ error: result.error });
+  }
+
+  const passwordHash = await hashPassword(password);
+  const sessionData = getSessionData(req);
+  sessionData.pendingSignup = {
+    username,
+    passwordHash,
+    phone: normalizedPhone,
+    phoneHash,
+    sentAt: Date.now(),
+    attempts: 0,
+  };
+
+  audit("auth.signup.otp_sent", { username, ip: req.ip, channels: result.channels });
+  return res.status(200).json({ ok: true, channels: result.channels });
+});
+
+authRouter.post("/signup/verify", async (req, res) => {
+  const sessionData = getSessionData(req);
+  const pendingSignup = sessionData.pendingSignup;
+
+  if (!pendingSignup) {
+    return res.status(400).json({ error: "No pending signup verification. Please request a new code." });
+  }
+
+  if (Date.now() - pendingSignup.sentAt > 10 * 60 * 1000) {
+    delete sessionData.pendingSignup;
+    return res.status(400).json({ error: "Verification code expired. Please request a new one." });
+  }
+
+  if (usernameExists(pendingSignup.username) || phoneHashExists(pendingSignup.phoneHash)) {
+    delete sessionData.pendingSignup;
+    return res.status(409).json({ error: "That account can no longer be created. Start signup again." });
+  }
+
+  const parsed = codeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Enter the 6-digit code we sent you." });
+  }
+
+  const approved = await verifyOtp(pendingSignup.phone, parsed.data.code);
+  if (!approved) {
+    pendingSignup.attempts += 1;
+    if (pendingSignup.attempts >= 5) {
+      delete sessionData.pendingSignup;
+      audit("auth.signup.otp_locked", { username: pendingSignup.username, ip: req.ip }, "warn");
+      return res.status(429).json({ error: "Too many failed attempts. Start signup again." });
+    }
+
+    audit("auth.signup.otp_failed", { username: pendingSignup.username, ip: req.ip, attempts: pendingSignup.attempts }, "warn");
+    return res.status(401).json({ error: "Incorrect code. Please try again." });
+  }
+
+  const previousAnonymousVotes = getAnonymousVotes(sessionData);
+  const user = createUser(pendingSignup.username, pendingSignup.passwordHash, pendingSignup.phoneHash);
+
+  await regenerateSession(req.session);
+  const newSession = getSessionData(req);
+  newSession.userId = user.id;
+  newSession.anonymousVotes = previousAnonymousVotes;
+
+  audit("auth.signup.success", { username: user.username, ip: req.ip });
+  return res.status(201).json({ ok: true });
+});
+
+authRouter.post("/login", loginLimiter, async (req, res) => {
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(401).json({ error: authErrorMessage });
+  }
+
+  const { username, password } = parsed.data;
+  const key = getAttemptKey(username, req.ip ?? "unknown");
+  const attempt = loginAttempts.get(key);
+
+  if (isLocked(attempt)) {
+    audit("auth.login.locked", { username, ip: req.ip }, "warn");
+    return res.status(429).json({ error: "Too many attempts. Try again later." });
+  }
+
+  const user = findUserByUsername(username);
+  if (!user) {
+    registerFailure(key);
+    audit("auth.login.failed", { username, ip: req.ip, reason: "missing_user" }, "warn");
+    return res.status(401).json({ error: authErrorMessage });
+  }
+
+  const validPassword = await verifyPassword(password, user.passwordHash);
+  if (!validPassword) {
+    registerFailure(key);
+    audit("auth.login.failed", { username, ip: req.ip, reason: "bad_password" }, "warn");
+    return res.status(401).json({ error: authErrorMessage });
+  }
+
+  clearFailures(key);
+  const previousAnonymousVotes = getAnonymousVotes(getSessionData(req));
+
+  await regenerateSession(req.session);
+  const newSession = getSessionData(req);
+  newSession.userId = user.id;
+  newSession.anonymousVotes = previousAnonymousVotes;
+
+  audit("auth.login.success", { username, ip: req.ip });
+  return res.status(200).json({ ok: true });
+});
+
+authRouter.post("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) return res.status(500).json({ error: "Logout failed." });
+    res.clearCookie("raw.sid");
+    audit("auth.logout", { ip: req.ip });
+    return res.status(200).json({ ok: true });
+  });
+});

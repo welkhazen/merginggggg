@@ -7,6 +7,7 @@ import {
   Settings,
   HelpCircle,
   Flame,
+  LogOut,
 } from "lucide-react";
 import { AvatarFigure, getAvatarTheme } from "@/components/ui/avatar-figure";
 import type { DashboardTab } from "./DashboardNav";
@@ -18,6 +19,7 @@ interface DashboardSidebarProps {
   avatarLevel: number;
   onHomeClick: () => void;
   isHome: boolean;
+  onLogout: () => void;
 }
 
 const navItems: { icon: typeof Home; label: string; tab: DashboardTab | "home" }[] = [
@@ -37,6 +39,7 @@ export function DashboardSidebar({
   avatarLevel,
   onHomeClick,
   isHome,
+  onLogout,
 }: DashboardSidebarProps) {
   return (
     <aside className="fixed left-0 top-14 bottom-0 z-40 hidden w-[200px] flex-col border-r border-raw-border/30 bg-raw-black lg:flex">
@@ -101,6 +104,13 @@ export function DashboardSidebar({
         <button className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-xs text-raw-silver/35 hover:text-raw-silver/60 transition-colors">
           <HelpCircle className="h-3.5 w-3.5" />
           <span>Support</span>
+        </button>
+        <button
+          onClick={onLogout}
+          className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-xs text-raw-silver/35 hover:text-raw-gold transition-colors"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          <span>Log Out</span>
         </button>
       </div>
     </aside>

@@ -1,8 +1,14 @@
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export interface User {
   id: string;
   username: string;
+}
+
+export interface AuthResult {
+  ok: boolean;
+  error?: string;
+  channels?: string[];
 }
 
 export interface PollOption {
@@ -16,6 +22,16 @@ export interface Poll {
   question: string;
   options: PollOption[];
   locked: boolean;
+}
+
+export type OnboardingStep = "avatar" | "polls" | "communities" | "marketplace" | "ready";
+
+interface BootstrapResponse {
+  user: User | null;
+  isLoggedIn: boolean;
+  polls: Poll[];
+  votedPollIds: string[];
+  freeVotesUsed: number;
 }
 
 const INITIAL_POLLS: Poll[] = [
@@ -48,58 +64,226 @@ const INITIAL_POLLS: Poll[] = [
   },
 ];
 
+const ONBOARDING_STATE_STORAGE_KEY = "raw.onboarding.v1";
+
+interface PersistedOnboardingEntry {
+  completed: boolean;
+  step: OnboardingStep;
+  answeredPollIds: string[];
+  selectedCommunityId: string | null;
+}
+
+type PersistedOnboardingMap = Record<string, PersistedOnboardingEntry>;
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+
+function buildApiUrl(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return API_BASE_URL ? `${API_BASE_URL}${normalizedPath}` : normalizedPath;
+}
+
+function readOnboardingMap(): PersistedOnboardingMap {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(ONBOARDING_STATE_STORAGE_KEY);
+    if (!rawValue) {
+      return {};
+    }
+
+    const parsed = JSON.parse(rawValue) as PersistedOnboardingMap;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeOnboardingMap(map: PersistedOnboardingMap): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(ONBOARDING_STATE_STORAGE_KEY, JSON.stringify(map));
+}
+
+async function parseApiResponse<T>(response: Response): Promise<T> {
+  let data: unknown = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof data === "object" &&
+      data !== null &&
+      "error" in data &&
+      typeof (data as { error?: unknown }).error === "string"
+        ? (data as { error: string }).error
+        : "Request failed.";
+
+    throw new Error(message);
+  }
+
+  return data as T;
+}
+
+async function apiGet<T>(path: string): Promise<T> {
+  const response = await fetch(buildApiUrl(path), {
+    method: "GET",
+    credentials: "include",
+  });
+
+  return parseApiResponse<T>(response);
+}
+
+async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(buildApiUrl(path), {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  return parseApiResponse<T>(response);
+}
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export function useRawStore() {
   const [user, setUser] = useState<User | null>(null);
   const [polls, setPolls] = useState<Poll[]>(INITIAL_POLLS);
   const [votedPolls, setVotedPolls] = useState<Set<string>>(new Set());
-  const [votedOptions, setVotedOptions] = useState<Record<string, string>>({});
-  const [purchasedInsights, setPurchasedInsights] = useState<Set<string>>(new Set());
   const [showSignup, setShowSignup] = useState(false);
   const [avatarLevel, setAvatarLevel] = useState(1);
+  const [freeVotesUsed, setFreeVotesUsed] = useState(0);
+  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>("avatar");
+  const [onboardingAnsweredPollIds, setOnboardingAnsweredPollIds] = useState<Set<string>>(new Set());
+  const [onboardingSelectedCommunityId, setOnboardingSelectedCommunityId] = useState<string | null>(null);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
   const isLoggedIn = user !== null;
-  const freeVotesUsed = votedPolls.size;
+
+  const syncFromBootstrap = useCallback((payload: BootstrapResponse) => {
+    setUser(payload.user);
+    setPolls(payload.polls);
+    setVotedPolls(new Set(payload.votedPollIds));
+    setFreeVotesUsed(payload.freeVotesUsed);
+  }, []);
+
+  const refreshBootstrap = useCallback(async () => {
+    // Backend disabled — skip bootstrap fetch
+  }, []);
+
+  useEffect(() => {
+    void refreshBootstrap();
+  }, [refreshBootstrap]);
+
+  useEffect(() => {
+    if (!user) {
+      setOnboardingStep("avatar");
+      setOnboardingAnsweredPollIds(new Set());
+      setOnboardingSelectedCommunityId(null);
+      setOnboardingCompleted(false);
+      return;
+    }
+
+    const onboardingMap = readOnboardingMap();
+    const entry = onboardingMap[user.id];
+    if (!entry) {
+      setOnboardingStep("avatar");
+      setOnboardingAnsweredPollIds(new Set());
+      setOnboardingSelectedCommunityId(null);
+      setOnboardingCompleted(false);
+      return;
+    }
+
+    setOnboardingStep(entry.step ?? "avatar");
+    setOnboardingAnsweredPollIds(new Set(entry.answeredPollIds ?? []));
+    setOnboardingSelectedCommunityId(entry.selectedCommunityId ?? null);
+    setOnboardingCompleted(Boolean(entry.completed));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const onboardingMap = readOnboardingMap();
+    onboardingMap[user.id] = {
+      completed: onboardingCompleted,
+      step: onboardingStep,
+      answeredPollIds: [...onboardingAnsweredPollIds],
+      selectedCommunityId: onboardingSelectedCommunityId,
+    };
+    writeOnboardingMap(onboardingMap);
+  }, [onboardingAnsweredPollIds, onboardingCompleted, onboardingSelectedCommunityId, onboardingStep, user]);
 
   const vote = useCallback(
     (pollId: string, optionId: string) => {
-      if (!isLoggedIn && freeVotesUsed >= 3) {
-        setShowSignup(true);
-        return;
-      }
-
-      const poll = polls.find((p) => p.id === pollId);
-      if (!poll) return;
-      if (poll.locked && !isLoggedIn) {
-        setShowSignup(true);
-        return;
-      }
-      if (votedPolls.has(pollId)) return;
-
+      // Backend disabled — update vote state locally
+      setVotedPolls((prev) => new Set([...prev, pollId]));
       setPolls((prev) =>
-        prev.map((p) =>
-          p.id === pollId
-            ? {
-                ...p,
-                options: p.options.map((o) =>
-                  o.id === optionId ? { ...o, votes: o.votes + 1 } : o
-                ),
-              }
-            : p
+        prev.map((poll) =>
+          poll.id === pollId
+            ? { ...poll, options: poll.options.map((opt) => opt.id === optionId ? { ...opt, votes: opt.votes + 1 } : opt) }
+            : poll
         )
       );
-      setVotedPolls((prev) => new Set(prev).add(pollId));
-      setVotedOptions((prev) => ({ ...prev, [pollId]: optionId }));
     },
-    [isLoggedIn, freeVotesUsed, polls, votedPolls]
+    []
   );
 
-  const signup = useCallback((username: string, _password: string) => {
-    setUser({ id: crypto.randomUUID(), username });
+  const requestSignupOtp = useCallback(async (username: string, _password: string, _phone: string): Promise<AuthResult> => {
+    // OTP / Twilio disabled — mock signup locally
+    setUser({ id: `local-${Date.now()}`, username });
     setShowSignup(false);
+    return { ok: true };
   }, []);
 
-  const purchaseInsight = useCallback((insightId: string) => {
-    setPurchasedInsights((prev) => new Set(prev).add(insightId));
+  const verifySignupOtp = useCallback(async (_code: string): Promise<AuthResult> => {
+    // OTP disabled — no-op
+    return { ok: true };
+  }, []);
+
+  const login = useCallback(async (username: string, _password: string): Promise<AuthResult> => {
+    // Backend disabled — mock login locally
+    setUser({ id: `local-${Date.now()}`, username });
+    setShowSignup(false);
+    return { ok: true };
+  }, []);
+
+  const logout = useCallback(() => {
+    // Backend disabled — clear user locally
+    setUser(null);
+  }, []);
+
+  const markOnboardingPollAnswered = useCallback((pollId: string) => {
+    setOnboardingAnsweredPollIds((previous) => {
+      const next = new Set(previous);
+      next.add(pollId);
+      return next;
+    });
+  }, []);
+
+  const resetOnboardingProgress = useCallback(() => {
+    setOnboardingStep("avatar");
+    setOnboardingAnsweredPollIds(new Set());
+    setOnboardingSelectedCommunityId(null);
+    setOnboardingCompleted(false);
+  }, []);
+
+  const completeOnboarding = useCallback(() => {
+    setOnboardingCompleted(true);
+    setOnboardingStep("ready");
   }, []);
 
   return {
@@ -107,15 +291,24 @@ export function useRawStore() {
     isLoggedIn,
     polls,
     votedPolls,
-    votedOptions,
-    purchasedInsights,
     freeVotesUsed,
     showSignup,
     setShowSignup,
     avatarLevel,
     setAvatarLevel,
+    onboardingStep,
+    setOnboardingStep,
+    onboardingAnsweredPollIds,
+    markOnboardingPollAnswered,
+    onboardingSelectedCommunityId,
+    setOnboardingSelectedCommunityId,
+    onboardingCompleted,
+    completeOnboarding,
+    resetOnboardingProgress,
     vote,
-    signup,
-    purchaseInsight,
+    requestSignupOtp,
+    verifySignupOtp,
+    login,
+    logout,
   };
 }

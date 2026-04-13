@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { LogOut } from "lucide-react";
 import { DashboardNav, type DashboardTab } from "@/components/dashboard/DashboardNav";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
@@ -7,18 +8,15 @@ import { DashboardCommunities } from "@/components/dashboard/DashboardCommunitie
 import { DashboardMarketplace } from "@/components/dashboard/DashboardMarketplace";
 import { DashboardProfile } from "@/components/dashboard/DashboardProfile";
 import type { User, Poll } from "@/store/useRawStore";
-import { computeRawInsights } from "@/features/insights/insights-engine";
 
 interface DashboardProps {
   user: User;
   polls: Poll[];
   votedPolls: Set<string>;
-  votedOptions: Record<string, string>;
-  purchasedInsights: Set<string>;
   avatarLevel: number;
   setAvatarLevel: (level: number) => void;
   vote: (pollId: string, optionId: string) => void;
-  purchaseInsight: (insightId: string) => void;
+  onLogout: () => void;
 }
 
 export default function Dashboard({
@@ -28,23 +26,10 @@ export default function Dashboard({
   avatarLevel,
   setAvatarLevel,
   vote,
-  votedOptions,
-  purchasedInsights,
-  purchaseInsight,
+  onLogout,
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<DashboardTab>("polls");
   const [isHome, setIsHome] = useState(true);
-  const computedInsights = useMemo(
-    () =>
-      computeRawInsights({
-        polls,
-        votedPolls,
-        votedOptions,
-        avatarLevel,
-        purchasedInsightIds: purchasedInsights,
-      }),
-    [polls, votedPolls, votedOptions, avatarLevel, purchasedInsights]
-  );
 
   const handleTabChange = (tab: DashboardTab) => {
     setActiveTab(tab);
@@ -53,15 +38,6 @@ export default function Dashboard({
 
   const handleHomeClick = () => {
     setIsHome(true);
-  };
-
-  const handlePurchaseInsight = (insightId: string) => {
-    const selectedInsight = computedInsights.find((insight) => insight.id === insightId);
-    if (!selectedInsight || selectedInsight.status !== "locked-premium") {
-      return;
-    }
-
-    purchaseInsight(insightId);
   };
 
   const renderContent = () => {
@@ -83,11 +59,7 @@ export default function Dashboard({
           <DashboardPolls
             polls={polls}
             votedPolls={votedPolls}
-            votedOptions={votedOptions}
-            avatarLevel={avatarLevel}
-            purchasedInsights={purchasedInsights}
             onVote={vote}
-            onPurchaseInsight={handlePurchaseInsight}
           />
         );
       case "communities":
@@ -115,6 +87,7 @@ export default function Dashboard({
         onTabChange={handleTabChange}
         username={user.username}
         avatarLevel={avatarLevel}
+        onLogout={onLogout}
       />
 
       <DashboardSidebar
@@ -124,6 +97,7 @@ export default function Dashboard({
         avatarLevel={avatarLevel}
         onHomeClick={handleHomeClick}
         isHome={isHome}
+        onLogout={onLogout}
       />
 
       {/* Mobile bottom nav */}
@@ -133,6 +107,7 @@ export default function Dashboard({
         <MobileNavBtn label="Groups" active={!isHome && activeTab === "communities"} onClick={() => handleTabChange("communities")} />
         <MobileNavBtn label="Shop" active={!isHome && activeTab === "marketplace"} onClick={() => handleTabChange("marketplace")} />
         <MobileNavBtn label="Me" active={!isHome && activeTab === "profile"} onClick={() => handleTabChange("profile")} />
+        <MobileNavBtn label="Logout" active={false} onClick={onLogout} icon={<LogOut className="h-3.5 w-3.5" />} />
       </div>
 
       {/* Main content */}
@@ -149,10 +124,12 @@ function MobileNavBtn({
   label,
   active,
   onClick,
+  icon,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
+  icon?: React.ReactNode;
 }) {
   return (
     <button
@@ -161,6 +138,7 @@ function MobileNavBtn({
         active ? "text-raw-gold" : "text-raw-silver/35"
       }`}
     >
+      {icon}
       <span className={`text-[10px] font-medium ${active ? "text-raw-gold" : ""}`}>{label}</span>
       {active && <div className="h-0.5 w-4 rounded-full bg-raw-gold" />}
     </button>

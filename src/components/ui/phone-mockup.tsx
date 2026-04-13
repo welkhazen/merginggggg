@@ -9,7 +9,7 @@ interface PhoneMockupProps {
 
 export function PhoneMockup({ children, className = "", showStatusBar = true }: PhoneMockupProps) {
   return (
-    <div className={`relative mx-auto w-[280px] pointer-events-auto ${className}`}>
+    <div className={`relative mx-auto w-[280px] ${className}`}>
       {/* Outer frame */}
       <div className="rounded-[2.8rem] border-[3px] border-[#2a2a2e] bg-[#0a0a0a] p-[6px] shadow-2xl shadow-black/60">
         {/* Inner bezel */}
@@ -41,7 +41,7 @@ export function PhoneMockup({ children, className = "", showStatusBar = true }: 
           )}
 
           {/* Screen content */}
-          <div className="h-[480px] pointer-events-auto overflow-hidden">
+          <div className="min-h-[480px]">
             {children}
           </div>
 
