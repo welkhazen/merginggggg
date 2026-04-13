@@ -131,7 +131,7 @@ export function DashboardHome({
             </div>
             <div className="flex items-center gap-2">
               <MessageCircle className="h-3.5 w-3.5 text-raw-gold/50" />
-              <span className="text-xs text-raw-silver/50">3 communities joined</span>
+              <span className="text-xs text-raw-silver/50">4 in-app chat communities</span>
             </div>
           </div>
         </div>
@@ -162,7 +162,7 @@ export function DashboardHome({
             View All <ChevronRight className="h-3 w-3" />
           </button>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <GlareCard>
             <div className="rounded-2xl border border-raw-border/40 bg-raw-surface/40 p-6 h-full">
               <div className="h-32 rounded-xl bg-gradient-to-br from-raw-gold/10 to-raw-surface mb-4 flex items-center justify-center">
@@ -202,6 +202,20 @@ export function DashboardHome({
               <h3 className="font-display text-sm tracking-wide text-raw-text">Mental Wellness</h3>
               <p className="mt-2 text-xs text-raw-silver/40 leading-relaxed">
                 Safe space for grounded reflection and support.
+              </p>
+            </div>
+          </GlareCard>
+          <GlareCard>
+            <div className="rounded-2xl border border-raw-border/40 bg-raw-surface/40 p-6 h-full">
+              <div className="h-32 rounded-xl bg-gradient-to-br from-raw-gold/[0.08] to-raw-surface mb-4 flex items-center justify-center">
+                <span className="font-display text-3xl text-raw-gold/20">SG</span>
+              </div>
+              <div className="mb-3 inline-block rounded-full border border-raw-gold/20 bg-raw-gold/5 px-2.5 py-0.5">
+                <span className="text-[9px] font-medium tracking-wider text-raw-gold/70 uppercase">Active</span>
+              </div>
+              <h3 className="font-display text-sm tracking-wide text-raw-text">Signal Guild</h3>
+              <p className="mt-2 text-xs text-raw-silver/40 leading-relaxed">
+                Culture, trends, money, and signal without recycled takes.
               </p>
             </div>
           </GlareCard>
