@@ -98,7 +98,7 @@ export function DiagonalSplitProgress({
           className={cn(
             "absolute inset-y-0 left-0 z-[1] flex items-center justify-center px-4 text-center disabled:cursor-default",
             transitionClass,
-            leftActive ? "ring-1 ring-inset ring-white/20" : ""
+            leftActive ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.16)]" : ""
           )}
           style={{
             width: `var(--dsp-left-width)`,
@@ -118,7 +118,7 @@ export function DiagonalSplitProgress({
           className={cn(
             "absolute inset-y-0 right-0 z-[1] flex items-center justify-center px-4 text-center disabled:cursor-default",
             transitionClass,
-            rightActive ? "ring-1 ring-inset ring-white/20" : ""
+            rightActive ? "drop-shadow-[0_0_10px_rgba(241,196,45,0.22)]" : ""
           )}
           style={{
             width: `var(--dsp-right-width)`,
