@@ -27,6 +27,13 @@ interface OnboardingJourneyProps {
 }
 
 const STEP_ORDER: OnboardingStep[] = ["avatar", "polls", "communities", "marketplace", "ready"];
+const STEP_LABELS: Record<OnboardingStep, string> = {
+  avatar: "avatar",
+  polls: "polls",
+  communities: "communities",
+  marketplace: "insights",
+  ready: "ready",
+};
 
 const FALLBACK_POLLS: OnboardingPoll[] = [
   {
@@ -62,27 +69,39 @@ const EXTRA_ONBOARDING_POLLS: OnboardingPoll[] = [
 const ONBOARDING_COMMUNITIES = [
   {
     id: "signal-room",
-    title: "Signal Room",
-    description: "High-context takes on trends, politics, and culture with evidence-first norms.",
+    title: "Late Night Talks",
+    description: "Unfiltered conversations that only happen after midnight. For night owls and deep thinkers.",
     members: "13.4k",
+    activeNow: "1.3k active",
+    image:
+      "https://images.unsplash.com/photo-1521119989659-a83eee488004?auto=format&fit=crop&w=900&q=80",
   },
   {
     id: "build-lab",
-    title: "Build Lab",
-    description: "Founders, makers, and operators sharing launches, pivots, and hard-earned lessons.",
+    title: "Self-Improvement Circle",
+    description: "Atomic habits, stoicism, and the relentless pursuit of the better self. Peer-driven accountability.",
     members: "8.7k",
+    activeNow: "843 active",
+    image:
+      "https://images.unsplash.com/photo-1508672019048-805c876b67e2?auto=format&fit=crop&w=900&q=80",
   },
   {
     id: "healing-circle",
     title: "Healing Circle",
     description: "Mental wellness, emotional check-ins, and anonymous support with respectful moderation.",
     members: "9.2k",
+    activeNow: "2.5k active",
+    image:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80",
   },
   {
     id: "money-guild",
     title: "Money Guild",
     description: "Income, investing, debt, and practical finance in clear language with no flex culture.",
     members: "11.1k",
+    activeNow: "1.1k active",
+    image:
+      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80",
   },
 ];
 
@@ -194,7 +213,7 @@ export function OnboardingJourney({
           {STEP_ORDER.map((step, index) => (
             <StepPill
               key={step}
-              label={step}
+              label={STEP_LABELS[step]}
               active={step === onboardingStep}
               complete={index < currentStepIndex}
             />
@@ -483,7 +502,7 @@ export function OnboardingJourney({
                 Choose a starting community. You can join more once you unlock the dashboard.
               </p>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                 {ONBOARDING_COMMUNITIES.map((community) => {
                   const isSelected = selectedCommunityId === community.id;
 
@@ -491,15 +510,46 @@ export function OnboardingJourney({
                     <button
                       key={community.id}
                       onClick={() => onSelectCommunity(community.id)}
-                      className={`rounded-2xl border p-4 text-left transition-all ${
+                      className={`group overflow-hidden rounded-[26px] border text-left transition-all duration-300 ${
                         isSelected
-                          ? "border-raw-gold/55 bg-raw-gold/10"
-                          : "border-raw-border/30 bg-raw-black/30 hover:border-raw-gold/25"
+                          ? "border-raw-gold/70 bg-raw-surface/80 shadow-[0_18px_36px_rgba(241,196,45,0.18)]"
+                          : "border-raw-border/35 bg-raw-surface/65 hover:-translate-y-0.5 hover:border-raw-gold/35 hover:shadow-[0_14px_28px_rgba(0,0,0,0.35)]"
                       }`}
                     >
-                      <p className="font-display text-sm tracking-wide text-raw-text">{community.title}</p>
-                      <p className="mt-1 text-xs text-raw-silver/55">{community.description}</p>
-                      <p className="mt-3 text-[10px] uppercase tracking-[0.15em] text-raw-gold/70">{community.members} members</p>
+                      <div className="relative h-48 overflow-hidden">
+                        <img
+                          src={community.image}
+                          alt={community.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
+
+                        <div className="absolute bottom-3 left-3 rounded-full border border-raw-border/60 bg-black/55 px-2.5 py-1 backdrop-blur-sm">
+                          <p className="text-[10px] uppercase tracking-[0.12em] text-raw-silver/80">
+                            <span className="mr-1 text-raw-gold">●</span>
+                            {community.activeNow}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="p-4">
+                        <p className="font-display text-[30px] leading-[1.06] text-raw-text">{community.title}</p>
+                        <p className="mt-3 text-[13px] leading-relaxed text-raw-silver/58">{community.description}</p>
+
+                        <div className="mt-5">
+                          <span
+                            className={`inline-flex rounded-full border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors ${
+                              isSelected
+                                ? "border-raw-gold/80 bg-raw-gold/15 text-raw-gold"
+                                : "border-raw-border/50 text-raw-gold/85 group-hover:border-raw-gold/45"
+                            }`}
+                          >
+                            Enter Circle
+                          </span>
+                        </div>
+
+                        <p className="mt-3 text-[10px] uppercase tracking-[0.14em] text-raw-gold/70">{community.members} members</p>
+                      </div>
                     </button>
                   );
                 })}
@@ -511,7 +561,7 @@ export function OnboardingJourney({
                   disabled={!canContinueFromCommunities}
                   className="rounded-xl bg-raw-gold px-5 py-2.5 text-sm font-semibold text-raw-black transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Next: Marketplace
+                  Next: Insights
                 </button>
               </div>
             </section>
@@ -519,18 +569,18 @@ export function OnboardingJourney({
 
           {onboardingStep === "marketplace" && (
             <section>
-              <h2 className="font-display text-xl tracking-wide text-raw-text">4. Marketplace is coming soon</h2>
+              <h2 className="font-display text-xl tracking-wide text-raw-text">4. Insights are coming soon</h2>
               <p className="mt-2 text-sm text-raw-silver/45">
-                The raW marketplace will unlock identity-based offers, trusted providers, and community-curated opportunities.
-                At launch, this section is in preview mode while we onboard founding partners.
+                The raW insights layer will unlock pattern tracking, personalized signal summaries, and community-powered perspective snapshots.
+                At launch, this section is in preview mode while we calibrate the first release.
               </p>
 
               <div className="mt-6 rounded-2xl border border-raw-border/35 bg-raw-black/35 p-5">
                 <p className="text-xs uppercase tracking-[0.16em] text-raw-gold/75">Preview features</p>
                 <ul className="mt-3 space-y-2 text-sm text-raw-silver/55">
-                  <li>Founding provider drops matched to your participation level</li>
-                  <li>Anonymous group buying opportunities</li>
-                  <li>Reputation-weighted recommendations from trusted circles</li>
+                  <li>Live behavioral trend snapshots from your answered polls</li>
+                  <li>Signal timelines that highlight how your stance changes over time</li>
+                  <li>Anonymous cohort comparisons with context-aware interpretations</li>
                 </ul>
               </div>
 
