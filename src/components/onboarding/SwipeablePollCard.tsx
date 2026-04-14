@@ -288,7 +288,7 @@ export function SwipeablePollCard({
                   }
                 }}
                 disabled={!commentText.trim()}
-                className="mt-3 w-full rounded-lg bg-raw-gold px-3 py-2 text-xs font-semibold text-raw-black transition-opacity disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+                className="mt-3 w-full rounded-lg bg-raw-gold px-3 py-2 text-xs font-semibold text-raw-ink transition-opacity disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
               >
                 Post Comment
               </button>
@@ -363,7 +363,7 @@ export function SwipeablePollCard({
                                 }
                               }}
                               disabled={!replyText.trim()}
-                              className="flex-1 rounded-lg bg-raw-gold px-2.5 py-1.5 text-[10px] font-semibold text-raw-black transition-opacity disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+                              className="flex-1 rounded-lg bg-raw-gold px-2.5 py-1.5 text-[10px] font-semibold text-raw-ink transition-opacity disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
                             >
                               Post Reply
                             </button>

@@ -202,7 +202,7 @@ export function PollComments({
           <button
             onClick={handleSubmitComment}
             disabled={!newComment.trim()}
-            className="rounded-lg bg-raw-gold px-4 py-2.5 text-xs font-semibold text-raw-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-raw-gold/90 transition-all"
+            className="rounded-lg bg-raw-gold px-4 py-2.5 text-xs font-semibold text-raw-ink disabled:opacity-40 disabled:cursor-not-allowed hover:bg-raw-gold/90 transition-all"
           >
             Post
           </button>

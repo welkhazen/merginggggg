@@ -33,6 +33,7 @@ const Index = () => {
     onboardingSelectedCommunityId,
     setOnboardingSelectedCommunityId,
     onboardingCompleted,
+    isOnboardingResolved,
     completeOnboarding,
     vote,
     requestSignupOtp,
@@ -62,6 +63,17 @@ const Index = () => {
         <div>
           <p className="font-display text-sm uppercase tracking-[0.25em] text-raw-gold/70">Redirecting</p>
           <p className="mt-3 text-sm">Taking you to myraw.app...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoggedIn && user && !isOnboardingResolved) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-raw-black to-raw-black/80">
+        <div className="text-center">
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-raw-border border-t-raw-gold mb-4"></div>
+          <p className="text-raw-silver/60 text-sm">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -113,7 +125,7 @@ const Index = () => {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => setShowSignup(true)}
-              className="rounded-xl bg-raw-gold px-6 py-3 text-sm font-semibold text-raw-black"
+              className="rounded-xl bg-raw-gold px-6 py-3 text-sm font-semibold text-raw-ink"
             >
               Sign In / Sign Up
             </button>

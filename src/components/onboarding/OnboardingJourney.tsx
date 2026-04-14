@@ -391,7 +391,7 @@ export function OnboardingJourney({
                 <button
                   onClick={goToNextStep}
                   disabled={!canContinueFromAvatar}
-                  className="rounded-xl bg-raw-gold px-5 py-2.5 text-sm font-semibold text-raw-black transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-xl bg-raw-gold px-5 py-2.5 text-sm font-semibold text-raw-ink transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Next: Polls
                 </button>
@@ -480,7 +480,7 @@ export function OnboardingJourney({
                               <button
                                 onClick={goToNextStep}
                                 disabled={!canContinueFromPolls}
-                                className="flex-1 rounded-lg bg-raw-gold px-4 py-2.5 text-xs font-semibold text-raw-black transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                                className="flex-1 rounded-lg bg-raw-gold px-4 py-2.5 text-xs font-semibold text-raw-ink transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 Complete →
                               </button>
@@ -559,7 +559,7 @@ export function OnboardingJourney({
                 <button
                   onClick={goToNextStep}
                   disabled={!canContinueFromCommunities}
-                  className="rounded-xl bg-raw-gold px-5 py-2.5 text-sm font-semibold text-raw-black transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-xl bg-raw-gold px-5 py-2.5 text-sm font-semibold text-raw-ink transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Next: Insights
                 </button>
@@ -587,7 +587,7 @@ export function OnboardingJourney({
               <div className="mt-8 flex justify-end">
                 <button
                   onClick={goToNextStep}
-                  className="rounded-xl bg-raw-gold px-5 py-2.5 text-sm font-semibold text-raw-black"
+                  className="rounded-xl bg-raw-gold px-5 py-2.5 text-sm font-semibold text-raw-ink"
                 >
                   Next: Ready
                 </button>
@@ -605,7 +605,7 @@ export function OnboardingJourney({
 
               <button
                 onClick={onCompleteOnboarding}
-                className="mt-8 rounded-2xl bg-raw-gold px-7 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-raw-black"
+                className="mt-8 rounded-2xl bg-raw-gold px-7 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-raw-ink"
               >
                 Click If You Are Ready To Be raW
               </button>

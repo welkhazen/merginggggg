@@ -25,6 +25,11 @@ export function ContainerTextFlip({
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [width, setWidth] = useState(100);
   const textRef = React.useRef(null);
+  const containerStyle = {
+    background: "linear-gradient(180deg, rgb(var(--raw-surface) / 0.96) 0%, rgb(var(--raw-black) / 0.9) 100%)",
+    boxShadow:
+      "inset 0 -1px rgb(var(--raw-black) / 0.45), inset 0 0 0 1px rgb(var(--raw-accent) / 0.16), 0 10px 24px rgb(var(--raw-black) / 0.18)",
+  } satisfies React.CSSProperties;
   const updateWidthForWord = () => {
     if (textRef.current) {
       // Add some padding to the text width (30px on each side)
@@ -50,10 +55,9 @@ export function ContainerTextFlip({
       layoutId={`words-here-${id}`}
       animate={{ width }}
       transition={{ duration: animationDuration / 2000 }}
+      style={containerStyle}
       className={cn(
         "relative inline-block rounded-2xl pt-2 pb-3 text-center text-4xl font-display tracking-wide text-raw-text md:text-7xl",
-        "[background:linear-gradient(to_bottom,#1a1a1a,#121212)]",
-        "shadow-[inset_0_-1px_#080808,inset_0_0_0_1px_rgba(241,196,45,0.15),_0_4px_8px_#00000052]",
         className,
       )}
       key={words[currentWordIndex]}

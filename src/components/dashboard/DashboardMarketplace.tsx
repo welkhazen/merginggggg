@@ -162,7 +162,7 @@ export function DashboardMarketplace({ avatarLevel }: { avatarLevel: number }) {
                       item.price === "Earned"
                         ? "border border-raw-gold/30 text-raw-gold/70 bg-raw-gold/[0.06]"
                         : item.price === "Free"
-                        ? "bg-raw-gold text-raw-black hover:bg-raw-gold/90"
+                        ? "bg-raw-gold text-raw-ink hover:bg-raw-gold/90"
                         : "border border-raw-gold/25 text-raw-gold/70 hover:bg-raw-gold/10"
                     }`}>
                       {item.price === "Earned" ? "Claimed" : item.price === "Free" ? "Equip" : "Get"}

@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { LogOut } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LogOut, Shield } from "lucide-react";
+import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { DashboardNav, type DashboardTab } from "@/components/dashboard/DashboardNav";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
@@ -28,16 +29,46 @@ export default function Dashboard({
   vote,
   onLogout,
 }: DashboardProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<DashboardTab>("polls");
   const [isHome, setIsHome] = useState(true);
+  const communityRouteMatch = matchPath("/dashboard/communities/:communityId", location.pathname);
+  const activeCommunityId = communityRouteMatch?.params.communityId ?? null;
+
+  useEffect(() => {
+    if (activeCommunityId) {
+      setActiveTab("communities");
+      setIsHome(false);
+      return;
+    }
+
+    if (location.pathname !== "/dashboard") {
+      return;
+    }
+  }, [activeCommunityId, location.pathname]);
 
   const handleTabChange = (tab: DashboardTab) => {
     setActiveTab(tab);
     setIsHome(false);
+    navigate("/dashboard");
   };
 
   const handleHomeClick = () => {
     setIsHome(true);
+    navigate("/dashboard");
+  };
+
+  const handleOpenCommunity = (communityId: string) => {
+    setActiveTab("communities");
+    setIsHome(false);
+    navigate(`/dashboard/communities/${communityId}`);
+  };
+
+  const handleBackToCommunities = () => {
+    setActiveTab("communities");
+    setIsHome(false);
+    navigate("/dashboard");
   };
 
   const renderContent = () => {
@@ -63,7 +94,14 @@ export default function Dashboard({
           />
         );
       case "communities":
-        return <DashboardCommunities />;
+        return (
+          <DashboardCommunities
+            user={user}
+            activeCommunityId={activeCommunityId}
+            onOpenCommunity={handleOpenCommunity}
+            onBackToCommunities={handleBackToCommunities}
+          />
+        );
       case "marketplace":
         return <DashboardMarketplace avatarLevel={avatarLevel} />;
       case "profile":
@@ -87,14 +125,17 @@ export default function Dashboard({
         onTabChange={handleTabChange}
         username={user.username}
         avatarLevel={avatarLevel}
+        showAdminLink={user.role === "admin"}
         onLogout={onLogout}
       />
 
       <DashboardSidebar
         activeTab={activeTab}
         onTabChange={handleTabChange}
+        userId={user.id}
         username={user.username}
         avatarLevel={avatarLevel}
+        showAdminLink={user.role === "admin"}
         onHomeClick={handleHomeClick}
         isHome={isHome}
         onLogout={onLogout}
@@ -107,6 +148,7 @@ export default function Dashboard({
         <MobileNavBtn label="Groups" active={!isHome && activeTab === "communities"} onClick={() => handleTabChange("communities")} />
         <MobileNavBtn label="Shop" active={!isHome && activeTab === "marketplace"} onClick={() => handleTabChange("marketplace")} />
         <MobileNavBtn label="Me" active={!isHome && activeTab === "profile"} onClick={() => handleTabChange("profile")} />
+        {user.role === "admin" && <MobileNavLink label="Admin" href="/admin" icon={<Shield className="h-3.5 w-3.5" />} />}
         <MobileNavBtn label="Logout" active={false} onClick={onLogout} icon={<LogOut className="h-3.5 w-3.5" />} />
       </div>
 
@@ -117,6 +159,23 @@ export default function Dashboard({
         </div>
       </main>
     </div>
+  );
+}
+
+function MobileNavLink({
+  label,
+  href,
+  icon,
+}: {
+  label: string;
+  href: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <a href={href} className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg text-raw-gold/80 transition-all hover:text-raw-gold">
+      {icon}
+      <span className="text-[10px] font-medium">{label}</span>
+    </a>
   );
 }
 
