@@ -7,6 +7,7 @@ import {
   MessageCircle,
   Target,
   ChevronRight,
+  Dices,
   Zap,
 } from "lucide-react";
 import type { Poll } from "@/store/useRawStore";
@@ -68,7 +69,14 @@ const dailyActivities = [
     title: "Level Up Challenge",
     desc: "Complete 3 interactions to earn XP",
     action: "Start",
-    tab: "polls" as DashboardTab,
+    tab: "challenges" as DashboardTab,
+  },
+  {
+    icon: Dices,
+    title: "Daily Spin",
+    desc: "Spin once and claim your reward",
+    action: "Spin",
+    tab: "daily-spin" as DashboardTab,
   },
 ];
 

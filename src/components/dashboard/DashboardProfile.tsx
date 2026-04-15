@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { AvatarFigure, getAvatarTheme } from "@/components/ui/avatar-figure";
-import { PhoneMockup } from "@/components/ui/phone-mockup";
 import {
   Trophy,
   Target,
@@ -59,7 +58,7 @@ export function DashboardProfile({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
-        {/* Avatar + Phone mockup column */}
+        {/* Avatar column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Avatar card */}
           <div className="rounded-2xl border border-raw-border/40 bg-raw-surface/40 p-6 flex flex-col items-center text-center">
@@ -95,41 +94,6 @@ export function DashboardProfile({
                   <AvatarFigure level={lvl} size="sm" selected={lvl === avatarLevel} />
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Phone mockup - app icon preview */}
-          <div className="hidden lg:block">
-            <p className="text-center font-display text-[10px] tracking-[0.3em] uppercase text-raw-silver/25 mb-3">
-              Your app icon
-            </p>
-            <div className="flex justify-center scale-[0.85] origin-top">
-              <PhoneMockup>
-                <div className="bg-gradient-to-b from-[#e8e8e8] to-[#d0d0d0] px-5 py-4 min-h-[480px]">
-                  <div className="grid grid-cols-4 gap-x-4 gap-y-5">
-                    <MiniIcon color="#32D74B" label="FaceTime" />
-                    <MiniIcon color="#FF3B30" label="Calendar" />
-                    <MiniIcon color="#FF9500" label="Photos" />
-                    <MiniIcon color="#5856D6" label="Camera" />
-                    <MiniIcon color="#000000" label="Clock" />
-                    <MiniIcon color="#34C759" label="Maps" />
-                    <MiniIcon color="#5AC8FA" label="Weather" />
-                    <MiniIcon color="#FFCC00" label="Notes" />
-                    <MiniIcon color="#FF2D55" label="Music" />
-                    <MiniIcon color="#AF52DE" label="Podcasts" />
-                    <div className="flex flex-col items-center gap-1">
-                      <div
-                        className="h-[52px] w-[52px] rounded-[12px] flex items-center justify-center shadow-md overflow-hidden"
-                        style={{ background: theme.bg }}
-                      >
-                        <AvatarFigure level={displayLevel} size="sm" />
-                      </div>
-                      <span className="text-[8px] text-[#333] font-medium">raW</span>
-                    </div>
-                    <MiniIcon color="#007AFF" label="Safari" />
-                  </div>
-                </div>
-              </PhoneMockup>
             </div>
           </div>
         </div>
@@ -190,18 +154,6 @@ export function DashboardProfile({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function MiniIcon({ color, label }: { color: string; label: string }) {
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <div
-        className="h-[52px] w-[52px] rounded-[12px] shadow-sm"
-        style={{ background: color, opacity: 0.7 }}
-      />
-      <span className="text-[8px] text-[#333] font-medium">{label}</span>
     </div>
   );
 }

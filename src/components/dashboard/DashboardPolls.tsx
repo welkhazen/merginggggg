@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Poll } from "@/store/useRawStore";
-import { GlareCard } from "@/components/ui/glare-card";
-import { BarChart3, CheckCircle2, ChevronLeft, ChevronRight, MessageCircle, TrendingUp, Users } from "lucide-react";
+import {
+  BarChart3,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  MessageCircle,
+  SendHorizontal,
+  Users,
+} from "lucide-react";
 
 interface PollHistoryComment {
   id: string;
@@ -13,6 +20,7 @@ interface PollHistoryComment {
 interface DashboardPollsProps {
   polls: Poll[];
   votedPolls: Set<string>;
+  avatarLevel: number;
   userId: string;
   username: string;
   dailyAnsweredCount: number;
@@ -21,173 +29,10 @@ interface DashboardPollsProps {
   onVote: (pollId: string, optionId: string) => void;
 }
 
-function PollCard({
-  poll,
-  hasVoted,
-  selectedOptionId,
-  isDailyPollLimitReached,
-  onAnswered,
-  onVote,
-}: {
-  poll: Poll;
-  hasVoted: boolean;
-  selectedOptionId?: string;
-  isDailyPollLimitReached: boolean;
-  onAnswered: () => void;
-  onVote: (optionId: string) => void;
-}) {
-  const [dragX, setDragX] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartXRef = useRef(0);
-  const cardRef = useRef<HTMLDivElement | null>(null);
-  const totalVotes = poll.options.reduce((sum, o) => sum + o.votes, 0);
-  const canSwipe = poll.options.length >= 2 && !hasVoted && !isDailyPollLimitReached;
-
-  const handleVote = (optionId: string) => {
-    if (hasVoted || isDailyPollLimitReached) {
-      return;
-    }
-
-    onVote(optionId);
-    onAnswered();
-  };
-
-  useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      if (!isDragging || !cardRef.current || !canSwipe) {
-        return;
-      }
-
-      const deltaX = event.clientX - dragStartXRef.current;
-      setDragX(Math.max(-120, Math.min(120, deltaX)));
-    };
-
-    const handleMouseUp = () => {
-      if (!isDragging || !canSwipe) {
-        return;
-      }
-
-      if (Math.abs(dragX) >= 60) {
-        const chosenOption = dragX > 0 ? poll.options[0] : poll.options[1];
-        handleVote(chosenOption.id);
-      }
-
-      setDragX(0);
-      setIsDragging(false);
-    };
-
-    if (isDragging) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
-    }
-  }, [canSwipe, dragX, isDragging, poll.options]);
-
-  const yesNoMode = poll.options.length >= 2;
-  const leftOption = poll.options[0];
-  const rightOption = poll.options[1];
-  const leftPct = totalVotes > 0 ? Math.round((leftOption?.votes ?? 0) / totalVotes * 100) : 0;
-  const rightPct = totalVotes > 0 ? Math.round((rightOption?.votes ?? 0) / totalVotes * 100) : 0;
-
-  return (
-    <GlareCard>
-      <div
-        ref={cardRef}
-        onMouseDown={(event) => {
-          if (!canSwipe) {
-            return;
-          }
-          dragStartXRef.current = event.clientX;
-          setIsDragging(true);
-        }}
-        onTouchStart={(event) => {
-          if (!canSwipe) {
-            return;
-          }
-          dragStartXRef.current = event.touches[0].clientX;
-          setIsDragging(true);
-        }}
-        onTouchMove={(event) => {
-          if (!isDragging || !canSwipe) {
-            return;
-          }
-
-          const deltaX = event.touches[0].clientX - dragStartXRef.current;
-          setDragX(Math.max(-120, Math.min(120, deltaX)));
-        }}
-        onTouchEnd={() => {
-          if (!isDragging || !canSwipe) {
-            return;
-          }
-
-          if (Math.abs(dragX) >= 60) {
-            const chosenOption = dragX > 0 ? poll.options[0] : poll.options[1];
-            handleVote(chosenOption.id);
-          }
-
-          setDragX(0);
-          setIsDragging(false);
-        }}
-        className="rounded-2xl border border-raw-border/40 bg-raw-surface/40 p-6 transition-all"
-        style={{
-          transform: canSwipe ? `translateX(${dragX * 0.5}px)` : undefined,
-        }}
-      >
-        <p className="font-display text-sm tracking-wide text-raw-text">{poll.question}</p>
-        {canSwipe && yesNoMode && (
-          <p className="mt-2 text-[11px] text-raw-silver/35">Swipe right for {leftOption.text}, swipe left for {rightOption.text}</p>
-        )}
-        <div className="mt-5 space-y-2.5">
-          {poll.options.map((option) => {
-            const pct = totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
-            return (
-              <button
-                key={option.id}
-                onClick={() => handleVote(option.id)}
-                disabled={hasVoted || isDailyPollLimitReached}
-                className={`relative w-full overflow-hidden rounded-xl border text-left transition-all ${
-                  hasVoted
-                    ? "border-raw-border/20 bg-raw-black/40 cursor-default"
-                    : isDailyPollLimitReached
-                      ? "border-raw-border/20 bg-raw-black/20 cursor-not-allowed opacity-55"
-                      : "border-raw-border/40 bg-raw-black/30 hover:border-raw-gold/20 cursor-pointer"
-                }`}
-              >
-                {hasVoted && (
-                  <div
-                    className="absolute inset-y-0 left-0 bg-raw-gold/10 transition-all duration-700"
-                    style={{ width: `${pct}%` }}
-                  />
-                )}
-                <div className="relative flex items-center justify-between px-4 py-2.5">
-                  <span className={`text-xs ${selectedOptionId === option.id ? "text-raw-gold" : "text-raw-silver/70"}`}>{option.text}</span>
-                  {hasVoted && (
-                    <span className="text-[11px] font-medium text-raw-gold/60">{pct}%</span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        {hasVoted && (
-          <div className="mt-3 flex items-center justify-between text-[10px] text-raw-silver/35">
-            <span>{totalVotes.toLocaleString()} anonymous responses</span>
-            {yesNoMode && (
-              <span>{leftPct}% / {rightPct}%</span>
-            )}
-          </div>
-        )}
-      </div>
-    </GlareCard>
-  );
-}
-
 export function DashboardPolls({
   polls,
   votedPolls,
+  avatarLevel,
   userId,
   username,
   dailyAnsweredCount,
@@ -195,16 +40,17 @@ export function DashboardPolls({
   isDailyPollLimitReached,
   onVote,
 }: DashboardPollsProps) {
-  const historyAnswersStorageKey = `raw.poll-history.answers.${userId}`;
-  const historyCommentsStorageKey = `raw.poll-history.comments.${userId}`;
+  const answersStorageKey = `raw.poll-history.answers.${userId}`;
+  const commentsStorageKey = `raw.poll-history.comments.${userId}`;
   const [answerHistory, setAnswerHistory] = useState<Record<string, string>>({});
   const [historyComments, setHistoryComments] = useState<Record<string, PollHistoryComment[]>>({});
-  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [commentDraft, setCommentDraft] = useState("");
   const [currentPollIndex, setCurrentPollIndex] = useState(0);
+  const pointerStartXRef = useRef<number | null>(null);
 
   useEffect(() => {
     try {
-      const rawAnswers = window.localStorage.getItem(historyAnswersStorageKey);
+      const rawAnswers = window.localStorage.getItem(answersStorageKey);
       const parsedAnswers = rawAnswers ? (JSON.parse(rawAnswers) as Record<string, string>) : {};
       setAnswerHistory(parsedAnswers && typeof parsedAnswers === "object" ? parsedAnswers : {});
     } catch {
@@ -212,33 +58,21 @@ export function DashboardPolls({
     }
 
     try {
-      const rawComments = window.localStorage.getItem(historyCommentsStorageKey);
+      const rawComments = window.localStorage.getItem(commentsStorageKey);
       const parsedComments = rawComments ? (JSON.parse(rawComments) as Record<string, PollHistoryComment[]>) : {};
       setHistoryComments(parsedComments && typeof parsedComments === "object" ? parsedComments : {});
     } catch {
       setHistoryComments({});
     }
-  }, [historyAnswersStorageKey, historyCommentsStorageKey]);
+  }, [answersStorageKey, commentsStorageKey]);
 
   useEffect(() => {
-    window.localStorage.setItem(historyAnswersStorageKey, JSON.stringify(answerHistory));
-  }, [answerHistory, historyAnswersStorageKey]);
+    window.localStorage.setItem(answersStorageKey, JSON.stringify(answerHistory));
+  }, [answerHistory, answersStorageKey]);
 
   useEffect(() => {
-    window.localStorage.setItem(historyCommentsStorageKey, JSON.stringify(historyComments));
-  }, [historyComments, historyCommentsStorageKey]);
-
-  const handleVote = (pollId: string, optionId: string) => {
-    setAnswerHistory((prev) => ({ ...prev, [pollId]: optionId }));
-    if (!votedPolls.has(pollId)) {
-      onVote(pollId, optionId);
-    }
-  };
-
-  const answeredPolls = useMemo(
-    () => polls.filter((poll) => votedPolls.has(poll.id) || Boolean(answerHistory[poll.id])),
-    [answerHistory, polls, votedPolls]
-  );
+    window.localStorage.setItem(commentsStorageKey, JSON.stringify(historyComments));
+  }, [commentsStorageKey, historyComments]);
 
   useEffect(() => {
     if (currentPollIndex >= polls.length && polls.length > 0) {
@@ -246,224 +80,432 @@ export function DashboardPolls({
     }
   }, [currentPollIndex, polls.length]);
 
-  const totalResponses = polls.reduce(
-    (sum, p) => sum + p.options.reduce((s, o) => s + o.votes, 0),
-    0
+  const currentPoll = polls[currentPollIndex];
+  const selectedOptionId = currentPoll ? answerHistory[currentPoll.id] : undefined;
+  const hasVotedCurrent = Boolean(
+    currentPoll && (votedPolls.has(currentPoll.id) || answerHistory[currentPoll.id])
   );
+  const currentComments = currentPoll ? historyComments[currentPoll.id] ?? [] : [];
+
+  const totalResponses = useMemo(
+    () => polls.reduce((sum, poll) => sum + poll.options.reduce((acc, option) => acc + option.votes, 0), 0),
+    [polls]
+  );
+
+  const pollsAnswered = votedPolls.size;
+  const paidUnlocks = {
+    bigFiveProfile: false,
+    shadowSelf: false,
+    decisionFingerprint: false,
+    identityArc: false,
+  };
+
+  const insightsProgress = [
+    {
+      id: "myers-briggs",
+      name: "Myers-Briggs",
+      description: "Discover your personality type across 4 key dimensions of how you see the world.",
+      unlockRequirements: ["Reach level 1", "OR answer 5 polls"],
+      unlocked: avatarLevel >= 1 || pollsAnswered >= 5,
+      lockedAction: "View Report",
+    },
+    {
+      id: "big-five-profile",
+      name: "Big Five Profile",
+      description:
+        "Measure your openness, conscientiousness, extraversion, agreeableness, and emotional range.",
+      unlockRequirements: ["Reach level 2", "Answer 10 polls", "Pay $4 to unlock"],
+      unlocked: avatarLevel >= 2 && pollsAnswered >= 10 && paidUnlocks.bigFiveProfile,
+      lockedAction: "Complete to-do list",
+    },
+    {
+      id: "emotional-intelligence",
+      name: "Emotional Intelligence",
+      description:
+        "Understand how you process emotions, empathy, and interpersonal cues under pressure.",
+      unlockRequirements: ["Reach level 3", "Answer 15 polls"],
+      unlocked: avatarLevel >= 3 && pollsAnswered >= 15,
+      lockedAction: "Complete to-do list",
+    },
+    {
+      id: "shadow-self",
+      name: "Shadow Self",
+      description:
+        "Reveal hidden patterns, blind spots, and traits that surface in difficult moments.",
+      unlockRequirements: ["Path A", "Reach level 1", "Pay $8", "Path B", "Answer 50 polls"],
+      unlocked: (avatarLevel >= 1 && paidUnlocks.shadowSelf) || pollsAnswered >= 50,
+      lockedAction: "Unlock $8",
+    },
+    {
+      id: "decision-fingerprint",
+      name: "Decision Fingerprint",
+      description: "Map your decision style: instinctive, strategic, reflective, or adaptive.",
+      unlockRequirements: ["Reach level 4", "Answer 22 polls", "Pay $6 to unlock"],
+      unlocked: avatarLevel >= 4 && pollsAnswered >= 22 && paidUnlocks.decisionFingerprint,
+      lockedAction: "Complete to-do list",
+    },
+    {
+      id: "identity-arc",
+      name: "Identity Arc",
+      description: "Track how your personality signal changes over time as your answers evolve.",
+      unlockRequirements: ["Reach level 5", "Answer 30 polls", "Pay $9 to unlock"],
+      unlocked: avatarLevel >= 5 && pollsAnswered >= 30 && paidUnlocks.identityArc,
+      lockedAction: "Complete to-do list",
+    },
+  ];
+
+  const unlockedReports = insightsProgress.filter((item) => item.unlocked).length;
+
+  const handleVote = (pollId: string, optionId: string) => {
+    if (isDailyPollLimitReached) {
+      return;
+    }
+
+    setAnswerHistory((previous) => ({
+      ...previous,
+      [pollId]: optionId,
+    }));
+
+    if (!votedPolls.has(pollId)) {
+      onVote(pollId, optionId);
+    }
+  };
+
+  const voteFromSwipeDirection = (direction: "left" | "right") => {
+    if (!currentPoll || hasVotedCurrent || isDailyPollLimitReached) {
+      return;
+    }
+
+    const yesOption = currentPoll.options.find((option) => option.text.trim().toLowerCase() === "yes");
+    const noOption = currentPoll.options.find((option) => option.text.trim().toLowerCase() === "no");
+
+    if (direction === "right") {
+      const selected = yesOption ?? currentPoll.options[0];
+      if (selected) {
+        handleVote(currentPoll.id, selected.id);
+      }
+      return;
+    }
+
+    const selected = noOption ?? currentPoll.options[1] ?? currentPoll.options[0];
+    if (selected) {
+      handleVote(currentPoll.id, selected.id);
+    }
+  };
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointerStartXRef.current = event.clientX;
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerStartXRef.current === null) {
+      return;
+    }
+
+    const deltaX = event.clientX - pointerStartXRef.current;
+    pointerStartXRef.current = null;
+
+    const swipeThreshold = 60;
+    if (Math.abs(deltaX) < swipeThreshold) {
+      return;
+    }
+
+    voteFromSwipeDirection(deltaX > 0 ? "right" : "left");
+  };
+
+  const handleCommentAdd = () => {
+    if (!currentPoll) {
+      return;
+    }
+
+    const content = commentDraft.trim();
+    if (!content) {
+      return;
+    }
+
+    const nextComment: PollHistoryComment = {
+      id: `${currentPoll.id}-${Date.now()}`,
+      author: username,
+      content,
+      createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    setHistoryComments((previous) => ({
+      ...previous,
+      [currentPoll.id]: [nextComment, ...(previous[currentPoll.id] ?? [])],
+    }));
+
+    setCommentDraft("");
+  };
+
+  if (!currentPoll) {
+    return (
+      <div className="rounded-2xl border border-raw-border/30 bg-raw-black/30 p-6 text-center text-sm text-raw-silver/55">
+        No polls available yet.
+      </div>
+    );
+  }
+
+  const pollTotalVotes = currentPoll.options.reduce((sum, option) => sum + option.votes, 0);
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
+      <header>
         <h1 className="font-display text-2xl tracking-wide text-raw-text">Polls</h1>
-        <p className="mt-2 text-sm text-raw-silver/40">
-          Answer anonymously. See live results. Shape the community signal.
+        <p className="mt-2 text-sm text-raw-silver/45">
+          Anonymous voting, live percentages, and reflections from the community.
         </p>
-        <div className="mt-4 rounded-xl border border-raw-border/30 bg-raw-black/30 p-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-raw-silver/50">Daily progress</span>
-            <span className="font-medium text-raw-gold">{dailyAnsweredCount}/{dailyPollLimit} complete for today</span>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-raw-border/30">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-raw-gold/70 to-raw-gold transition-all"
-              style={{ width: `${Math.min(100, Math.round((dailyAnsweredCount / dailyPollLimit) * 100))}%` }}
-            />
-          </div>
-          {isDailyPollLimitReached && (
-            <p className="mt-2 text-[11px] text-raw-silver/45">Daily limit reached. You can answer more polls tomorrow.</p>
-          )}
-        </div>
-      </div>
+      </header>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl border border-raw-border/30 bg-raw-surface/30 p-4 text-center">
-          <BarChart3 className="h-4 w-4 text-raw-gold/40 mx-auto mb-2" />
-          <p className="text-lg font-bold text-raw-text">{polls.length}</p>
-          <p className="text-[9px] uppercase tracking-wider text-raw-silver/30">Active Polls</p>
+      <section className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-raw-border/35 bg-raw-surface/25 p-4 text-center">
+          <BarChart3 className="mx-auto mb-2 h-4 w-4 text-raw-gold/45" />
+          <p className="text-lg font-semibold text-raw-text">{polls.length}</p>
+          <p className="text-[10px] uppercase tracking-[0.16em] text-raw-silver/35">Live Polls</p>
         </div>
-        <div className="rounded-xl border border-raw-border/30 bg-raw-surface/30 p-4 text-center">
-          <Users className="h-4 w-4 text-raw-gold/40 mx-auto mb-2" />
-          <p className="text-lg font-bold text-raw-text">{totalResponses.toLocaleString()}</p>
-          <p className="text-[9px] uppercase tracking-wider text-raw-silver/30">Total Votes</p>
+        <div className="rounded-xl border border-raw-border/35 bg-raw-surface/25 p-4 text-center">
+          <Users className="mx-auto mb-2 h-4 w-4 text-raw-gold/45" />
+          <p className="text-lg font-semibold text-raw-text">{totalResponses.toLocaleString()}</p>
+          <p className="text-[10px] uppercase tracking-[0.16em] text-raw-silver/35">Total Votes</p>
         </div>
-        <div className="rounded-xl border border-raw-border/30 bg-raw-surface/30 p-4 text-center">
-          <TrendingUp className="h-4 w-4 text-raw-gold/40 mx-auto mb-2" />
-          <p className="text-lg font-bold text-raw-text">{votedPolls.size}</p>
-          <p className="text-[9px] uppercase tracking-wider text-raw-silver/30">Your Answers</p>
+        <div className="rounded-xl border border-raw-border/35 bg-raw-surface/25 p-4 text-center">
+          <MessageCircle className="mx-auto mb-2 h-4 w-4 text-raw-gold/45" />
+          <p className="text-lg font-semibold text-raw-text">{dailyAnsweredCount}/{dailyPollLimit}</p>
+          <p className="text-[10px] uppercase tracking-[0.16em] text-raw-silver/35">Daily Progress</p>
         </div>
-      </div>
+      </section>
 
-      {/* Single poll page */}
-      {polls.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-[0.14em] text-raw-silver/35">
-              Poll {currentPollIndex + 1} of {polls.length}
-            </p>
-            <div className="flex items-center gap-1.5">
-              {polls.map((poll, index) => (
-                <button
-                  key={poll.id}
-                  onClick={() => setCurrentPollIndex(index)}
-                  className={`h-1.5 rounded-full transition-all ${index === currentPollIndex ? "w-5 bg-raw-gold" : "w-1.5 bg-raw-border/60"}`}
-                  aria-label={`Go to poll ${index + 1}`}
-                />
-              ))}
+      <section className="relative mx-auto max-w-xl">
+        <button
+          onClick={() => setCurrentPollIndex((previous) => Math.max(0, previous - 1))}
+          disabled={currentPollIndex === 0}
+          className="absolute left-0 top-1/2 z-10 hidden -translate-x-1/2 -translate-y-1/2 rounded-full border border-raw-border/45 bg-raw-black/70 p-2.5 text-raw-silver/70 transition hover:border-raw-gold/45 hover:text-raw-gold disabled:cursor-not-allowed disabled:opacity-35 md:inline-flex"
+          aria-label="Previous poll"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        <button
+          onClick={() => setCurrentPollIndex((previous) => Math.min(polls.length - 1, previous + 1))}
+          disabled={currentPollIndex === polls.length - 1}
+          className="absolute right-0 top-1/2 z-10 hidden translate-x-1/2 -translate-y-1/2 rounded-full border border-raw-border/45 bg-raw-black/70 p-2.5 text-raw-silver/70 transition hover:border-raw-gold/45 hover:text-raw-gold disabled:cursor-not-allowed disabled:opacity-35 md:inline-flex"
+          aria-label="Next poll"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+
+        <div className="rounded-[2rem] border border-raw-border/40 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.12),rgba(0,0,0,0.05)_35%,rgba(0,0,0,0.6)_100%)] p-5 shadow-[0_20px_45px_rgba(0,0,0,0.4)] sm:p-6">
+          <div className="mb-4 flex items-center justify-between text-xs text-raw-silver/45">
+            <span>
+              {currentPollIndex + 1}/{polls.length} today
+            </span>
+            <span>{new Date().toLocaleDateString()}</span>
+          </div>
+
+          <div className="mb-5 flex items-center justify-center gap-1.5">
+            {polls.map((poll, index) => (
+              <button
+                key={poll.id}
+                onClick={() => setCurrentPollIndex(index)}
+                className={`h-1.5 rounded-full transition-all ${
+                  index === currentPollIndex ? "w-6 bg-raw-gold" : "w-2 bg-raw-border/60"
+                }`}
+                aria-label={`Go to poll ${index + 1}`}
+              />
+            ))}
+          </div>
+
+          <div
+            className="rounded-[1.7rem] border border-white/10 bg-black/65 p-5 sm:p-6"
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+          >
+            <h2 className="text-center font-display text-2xl leading-tight text-white sm:text-[2rem]">
+              {currentPoll.question}
+            </h2>
+
+            {!hasVotedCurrent && !isDailyPollLimitReached && (
+              <p className="mt-3 text-center text-[11px] uppercase tracking-[0.14em] text-white/40">
+                Swipe right for Yes, left for No
+              </p>
+            )}
+
+            <div className="mt-6 space-y-3">
+              {currentPoll.options.map((option) => {
+                const percentage = pollTotalVotes > 0 ? Math.round((option.votes / pollTotalVotes) * 100) : 0;
+                const isSelected = selectedOptionId === option.id;
+
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => handleVote(currentPoll.id, option.id)}
+                    disabled={hasVotedCurrent || isDailyPollLimitReached}
+                    className={`relative w-full overflow-hidden rounded-2xl border text-left transition ${
+                      hasVotedCurrent
+                        ? "cursor-default border-white/10 bg-white/5"
+                        : isDailyPollLimitReached
+                          ? "cursor-not-allowed border-white/10 bg-white/[0.04] opacity-55"
+                          : "border-white/15 bg-white/[0.06] hover:border-raw-gold/35"
+                    }`}
+                  >
+                    {hasVotedCurrent && (
+                      <div className="absolute inset-y-0 left-0 bg-raw-gold/20" style={{ width: `${percentage}%` }} />
+                    )}
+
+                    <div className="relative flex items-center justify-between px-4 py-3">
+                      <span className={`text-base ${isSelected ? "text-white" : "text-white/88"}`}>{option.text}</span>
+                      {hasVotedCurrent ? (
+                        <span className="text-base font-semibold text-white">{percentage}%</span>
+                      ) : (
+                        <span className="text-xs text-white/40">Vote</span>
+                      )}
+                    </div>
+
+                    {isSelected && hasVotedCurrent && (
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-white/30 bg-white/90 p-0.5 text-black">
+                        <Check className="h-3 w-3" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
+
+            {hasVotedCurrent ? (
+              <>
+                <div className="mt-5 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+                  <input
+                    value={commentDraft}
+                    onChange={(event) => setCommentDraft(event.target.value)}
+                    placeholder="Add a comment..."
+                    className="flex-1 bg-transparent text-sm text-white placeholder:text-white/35 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleCommentAdd}
+                    disabled={!commentDraft.trim()}
+                    className="rounded-full border border-white/20 bg-white/10 p-2 text-white/80 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Add comment"
+                  >
+                    <SendHorizontal className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-2.5">
+                  {currentComments.length === 0 ? (
+                    <p className="text-center text-xs text-white/45">No comments yet for this poll.</p>
+                  ) : (
+                    currentComments.slice(0, 3).map((comment) => (
+                      <article key={comment.id} className="rounded-2xl border border-white/20 bg-black/55 px-3.5 py-2.5">
+                        <div className="flex items-center justify-between text-[11px] text-white/50">
+                          <span>@{comment.author}</span>
+                          <span>{comment.createdAt}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-white/80">{comment.content}</p>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="mt-5 text-center text-xs text-white/45">Answer this poll to unlock comments.</p>
+            )}
           </div>
 
-          <PollCard
-            poll={polls[currentPollIndex]}
-            hasVoted={votedPolls.has(polls[currentPollIndex].id)}
-            selectedOptionId={answerHistory[polls[currentPollIndex].id]}
-            isDailyPollLimitReached={isDailyPollLimitReached}
-            onAnswered={() => {
-              if (polls.length <= 1) {
-                return;
-              }
+          {isDailyPollLimitReached && (
+            <p className="mt-4 text-center text-xs text-raw-silver/55">
+              Daily limit reached. You can answer more polls tomorrow.
+            </p>
+          )}
 
-              setCurrentPollIndex((previous) => (previous + 1) % polls.length);
-            }}
-            onVote={(optionId) => handleVote(polls[currentPollIndex].id, optionId)}
-          />
-
-          <div className="flex gap-3">
+          <div className="mt-4 flex gap-3 md:hidden">
             <button
               onClick={() => setCurrentPollIndex((previous) => Math.max(0, previous - 1))}
               disabled={currentPollIndex === 0}
-              className="flex-1 rounded-xl border border-raw-border/35 bg-raw-black/20 px-4 py-2.5 text-xs font-medium text-raw-silver/65 transition-all hover:border-raw-gold/35 hover:text-raw-gold disabled:cursor-not-allowed disabled:opacity-45"
+              className="flex-1 rounded-xl border border-raw-border/35 bg-raw-black/25 px-3 py-2 text-xs text-raw-silver/70 disabled:opacity-35"
             >
-              <span className="inline-flex items-center gap-1"><ChevronLeft className="h-3.5 w-3.5" /> Previous</span>
+              Previous
             </button>
             <button
               onClick={() => setCurrentPollIndex((previous) => Math.min(polls.length - 1, previous + 1))}
               disabled={currentPollIndex === polls.length - 1}
-              className="flex-1 rounded-xl border border-raw-border/35 bg-raw-black/20 px-4 py-2.5 text-xs font-medium text-raw-silver/65 transition-all hover:border-raw-gold/35 hover:text-raw-gold disabled:cursor-not-allowed disabled:opacity-45"
+              className="flex-1 rounded-xl border border-raw-border/35 bg-raw-black/25 px-3 py-2 text-xs text-raw-silver/70 disabled:opacity-35"
             >
-              <span className="inline-flex items-center gap-1">Next <ChevronRight className="h-3.5 w-3.5" /></span>
+              Next
             </button>
           </div>
         </div>
-      )}
+      </section>
 
-      {/* Personal history */}
-      <div className="rounded-2xl border border-raw-border/35 bg-raw-surface/25 p-5 sm:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display text-lg tracking-wide text-raw-text">Personal History</h2>
-            <p className="mt-1 text-xs text-raw-silver/45">
-              Review your answered polls and the comments you left.
-            </p>
-          </div>
-          <div className="rounded-full border border-raw-border/40 px-3 py-1 text-[11px] text-raw-gold/70">
-            {answeredPolls.length} answered
+      <section className="space-y-3">
+        <div className="rounded-2xl border border-raw-border/35 bg-raw-surface/20 p-4 sm:p-5">
+          <h2 className="font-display text-xl text-raw-text">Personality Insights</h2>
+          <p className="mt-1 text-sm text-raw-silver/55">
+            Your answers unlock deeper identity reports. Keep participating to reveal your full profile.
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-raw-border/30 bg-raw-black/30 p-3.5">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-raw-silver/40">Poll Coverage</p>
+              <p className="mt-1 text-base font-semibold text-raw-text">{pollsAnswered} polls answered</p>
+            </div>
+            <div className="rounded-xl border border-raw-border/30 bg-raw-black/30 p-3.5">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-raw-silver/40">Unlocked Reports</p>
+              <p className="mt-1 text-base font-semibold text-raw-text">{unlockedReports}/6</p>
+            </div>
           </div>
         </div>
 
-        {answeredPolls.length === 0 ? (
-          <div className="mt-5 rounded-xl border border-raw-border/30 bg-raw-black/35 p-5 text-center">
-            <p className="text-sm text-raw-silver/45">No answers yet. Vote on a poll to start your history.</p>
-          </div>
-        ) : (
-          <div className="mt-5 space-y-4">
-            {answeredPolls.map((poll) => {
-              const selectedOptionId = answerHistory[poll.id];
-              const selectedOption = poll.options.find((option) => option.id === selectedOptionId) ?? null;
-              const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
-              const selectedPct = selectedOption && totalVotes > 0
-                ? Math.round((selectedOption.votes / totalVotes) * 100)
-                : null;
-              const comments = historyComments[poll.id] ?? [];
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {insightsProgress.map((item) => (
+            <article
+              key={item.id}
+              className="rounded-2xl border border-raw-border/35 bg-raw-surface/25 p-4"
+            >
+              <div className="flex items-center justify-between">
+                <p className="font-display text-base text-raw-text">{item.name}</p>
+                <span
+                  className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] ${
+                    item.unlocked
+                      ? "border-emerald-400/35 bg-emerald-500/10 text-emerald-200"
+                      : "border-raw-border/45 bg-raw-black/40 text-raw-silver/50"
+                  }`}
+                >
+                  {item.unlocked ? "Unlocked" : "Locked"}
+                </span>
+              </div>
 
-              return (
-                <div key={poll.id} className="rounded-xl border border-raw-border/30 bg-raw-black/35 p-4">
-                  <p className="text-sm font-medium text-raw-text">{poll.question}</p>
+              <p className="mt-2 text-xs leading-relaxed text-raw-silver/55">{item.description}</p>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-raw-gold/30 bg-raw-gold/[0.08] px-2.5 py-1 text-[11px] text-raw-gold/80">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Your answer: {selectedOption?.text ?? "Recorded"}
-                    </span>
-                    {selectedPct !== null && (
-                      <span className="rounded-full border border-raw-border/45 px-2.5 py-1 text-[11px] text-raw-silver/65">
-                        {selectedPct}% chose this
-                      </span>
+              {!item.unlocked && (
+                <div className="mt-3 rounded-xl border border-raw-border/35 bg-raw-black/35 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-raw-silver/40">Unlock To-Do</p>
+                  <div className="mt-2 space-y-1.5 text-xs text-raw-silver/60">
+                    {item.unlockRequirements.map((requirement) => (
+                      <p key={`${item.id}-${requirement}`}>{requirement}</p>
+                    ))}
+                    {item.unlockRequirements.some((requirement) => /polls/i.test(requirement)) && (
+                      <p className="text-raw-silver/45">{pollsAnswered} polls answered</p>
                     )}
                   </div>
-
-                  <div className="mt-4 rounded-xl border border-raw-border/30 bg-raw-black/30 p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.12em] text-raw-silver/55">
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        Comments
-                      </p>
-                      <span className="text-[11px] text-raw-silver/45">{comments.length}</span>
-                    </div>
-
-                    <div className="mt-3 flex items-center gap-2">
-                      <input
-                        value={commentDrafts[poll.id] ?? ""}
-                        onChange={(event) =>
-                          setCommentDrafts((prev) => ({
-                            ...prev,
-                            [poll.id]: event.target.value,
-                          }))
-                        }
-                        placeholder="Add a comment to your history..."
-                        className="flex-1 rounded-full border border-raw-border/35 bg-raw-black/45 px-4 py-2 text-xs text-raw-text placeholder-raw-silver/30 focus:outline-none focus:border-raw-gold/45"
-                      />
-                      <button
-                        onClick={() => {
-                          const content = (commentDrafts[poll.id] ?? "").trim();
-                          if (!content) {
-                            return;
-                          }
-
-                          const nextComment: PollHistoryComment = {
-                            id: `${poll.id}-${Date.now()}`,
-                            author: username,
-                            content,
-                            createdAt: new Date().toLocaleString(),
-                          };
-
-                          setHistoryComments((prev) => ({
-                            ...prev,
-                            [poll.id]: [nextComment, ...(prev[poll.id] ?? [])],
-                          }));
-
-                          setCommentDrafts((prev) => ({ ...prev, [poll.id]: "" }));
-                        }}
-                        disabled={!(commentDrafts[poll.id] ?? "").trim()}
-                        className="rounded-full border border-raw-gold/30 bg-raw-gold/[0.08] px-3 py-2 text-[11px] font-medium text-raw-gold/80 transition-all hover:bg-raw-gold/[0.14] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Add
-                      </button>
-                    </div>
-
-                    <div className="mt-3 space-y-2">
-                      {comments.length === 0 ? (
-                        <p className="text-xs text-raw-silver/40">No comments yet for this poll.</p>
-                      ) : (
-                        comments.map((comment) => (
-                          <div key={comment.id} className="rounded-lg border border-raw-border/25 bg-raw-black/45 px-3 py-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[11px] font-medium text-raw-silver/75">{comment.author}</span>
-                              <span className="text-[10px] text-raw-silver/35">{comment.createdAt}</span>
-                            </div>
-                            <p className="mt-1 text-xs text-raw-silver/60">{comment.content}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              )}
+
+              <button
+                disabled={!item.unlocked}
+                className={`mt-4 w-full rounded-xl border px-3 py-2 text-xs transition ${
+                  item.unlocked
+                    ? "border-emerald-400/35 bg-emerald-500/12 text-emerald-100 hover:bg-emerald-500/20"
+                    : "cursor-not-allowed border-raw-border/40 bg-raw-black/35 text-raw-silver/45"
+                }`}
+              >
+                {item.unlocked ? "View Report" : item.lockedAction}
+              </button>
+            </article>
+          ))}
+        </div>
+
+        <p className="text-center text-xs text-raw-silver/45">More insight models coming soon</p>
+      </section>
     </div>
   );
 }

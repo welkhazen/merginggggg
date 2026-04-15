@@ -116,6 +116,42 @@ const INITIAL_POLLS: Poll[] = [
     ],
     locked: false,
   },
+  {
+    id: "poll-4",
+    question: "Do you trust your intuition when data is incomplete?",
+    options: [
+      { id: "p4-yes", text: "Yes", votes: 401 },
+      { id: "p4-no", text: "No", votes: 198 },
+    ],
+    locked: false,
+  },
+  {
+    id: "poll-5",
+    question: "Should people prioritize mental health over productivity goals?",
+    options: [
+      { id: "p5-yes", text: "Yes", votes: 467 },
+      { id: "p5-no", text: "No", votes: 159 },
+    ],
+    locked: false,
+  },
+  {
+    id: "poll-6",
+    question: "Do anonymous spaces help people express their true opinions?",
+    options: [
+      { id: "p6-yes", text: "Yes", votes: 512 },
+      { id: "p6-no", text: "No", votes: 131 },
+    ],
+    locked: false,
+  },
+  {
+    id: "poll-7",
+    question: "Is consistency more important than motivation for long-term change?",
+    options: [
+      { id: "p7-yes", text: "Yes", votes: 438 },
+      { id: "p7-no", text: "No", votes: 176 },
+    ],
+    locked: false,
+  },
 ];
 
 const ONBOARDING_STATE_STORAGE_KEY = "raw.onboarding.v1";
