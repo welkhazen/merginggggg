@@ -218,7 +218,7 @@ export function SignupModal({ open, onClose, onRequestSignupOtp, onVerifySignupO
               setConfirmPassword("");
             }}
             className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-              isSignup ? "bg-raw-gold text-raw-black" : "text-raw-silver/50 hover:text-raw-silver"
+              isSignup ? "bg-raw-gold text-raw-ink" : "text-raw-silver/50 hover:text-raw-silver"
             }`}
           >
             Sign Up
@@ -232,7 +232,7 @@ export function SignupModal({ open, onClose, onRequestSignupOtp, onVerifySignupO
               setConfirmPassword("");
             }}
             className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-              !isSignup ? "bg-raw-gold text-raw-black" : "text-raw-silver/50 hover:text-raw-silver"
+              !isSignup ? "bg-raw-gold text-raw-ink" : "text-raw-silver/50 hover:text-raw-silver"
             }`}
           >
             Sign In
@@ -325,7 +325,7 @@ export function SignupModal({ open, onClose, onRequestSignupOtp, onVerifySignupO
             <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-2 w-full rounded-xl bg-raw-gold py-3 text-sm font-bold text-raw-black transition-all hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20 disabled:cursor-not-allowed disabled:opacity-70"
+              className="mt-2 w-full rounded-xl bg-raw-gold py-3 text-sm font-bold text-raw-ink transition-all hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {isSubmitting ? "Creating..." : "Create Account"}
             </button>
@@ -368,7 +368,7 @@ export function SignupModal({ open, onClose, onRequestSignupOtp, onVerifySignupO
             <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-2 w-full rounded-xl bg-raw-gold py-3 text-sm font-bold text-raw-black transition-all hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20 disabled:cursor-not-allowed disabled:opacity-70"
+              className="mt-2 w-full rounded-xl bg-raw-gold py-3 text-sm font-bold text-raw-ink transition-all hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {isSubmitting ? "Checking..." : "Verify & Create Account"}
             </button>
@@ -444,7 +444,7 @@ export function SignupModal({ open, onClose, onRequestSignupOtp, onVerifySignupO
             <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-2 w-full rounded-xl bg-raw-gold py-3 text-sm font-bold text-raw-black transition-all hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20 disabled:cursor-not-allowed disabled:opacity-70"
+              className="mt-2 w-full rounded-xl bg-raw-gold py-3 text-sm font-bold text-raw-ink transition-all hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {isSubmitting ? "Checking..." : "Sign In"}
             </button>

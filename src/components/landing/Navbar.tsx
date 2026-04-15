@@ -34,7 +34,7 @@ export function Navbar({ isLoggedIn, username, onSignupClick }: NavbarProps) {
         ) : (
           <button
             onClick={onSignupClick}
-            className="rounded-full bg-raw-gold px-5 py-2 text-sm font-semibold text-raw-black transition-all hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20"
+            className="rounded-full bg-raw-gold px-5 py-2 text-sm font-semibold text-raw-ink transition-all hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20"
           >
             Join Free
           </button>

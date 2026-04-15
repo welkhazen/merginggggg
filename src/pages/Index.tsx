@@ -30,9 +30,13 @@ const Index = () => {
     setOnboardingStep,
     onboardingAnsweredPollIds,
     markOnboardingPollAnswered,
-    onboardingSelectedCommunityId,
-    setOnboardingSelectedCommunityId,
+    onboardingSelectedCommunityIds,
+    setOnboardingSelectedCommunityIds,
     onboardingCompleted,
+    isOnboardingResolved,
+    dailyAnsweredCount,
+    dailyPollLimit,
+    isDailyPollLimitReached,
     completeOnboarding,
     vote,
     requestSignupOtp,
@@ -67,6 +71,17 @@ const Index = () => {
     );
   }
 
+  if (isLoggedIn && user && !isOnboardingResolved) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-raw-black to-raw-black/80">
+        <div className="text-center">
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-raw-border border-t-raw-gold mb-4"></div>
+          <p className="text-raw-silver/60 text-sm">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Show dashboard when logged in
   if (isLoggedIn && user) {
     if (!onboardingCompleted) {
@@ -80,8 +95,20 @@ const Index = () => {
           onboardingAnsweredPollIds={onboardingAnsweredPollIds}
           onSetOnboardingStep={setOnboardingStep}
           onMarkPollAnswered={markOnboardingPollAnswered}
-          selectedCommunityId={onboardingSelectedCommunityId}
-          onSelectCommunity={setOnboardingSelectedCommunityId}
+          selectedCommunityIds={onboardingSelectedCommunityIds}
+          onToggleCommunity={(communityId) => {
+            setOnboardingSelectedCommunityIds((previous) => {
+              if (previous.includes(communityId)) {
+                return previous.filter((id) => id !== communityId);
+              }
+
+              if (previous.length >= 2) {
+                return previous;
+              }
+
+              return [...previous, communityId];
+            });
+          }}
           onCompleteOnboarding={completeOnboarding}
           onLogout={logout}
         />
@@ -95,6 +122,9 @@ const Index = () => {
         votedPolls={votedPolls}
         avatarLevel={avatarLevel}
         setAvatarLevel={setAvatarLevel}
+        dailyAnsweredCount={dailyAnsweredCount}
+        dailyPollLimit={dailyPollLimit}
+        isDailyPollLimitReached={isDailyPollLimitReached}
         vote={vote}
         onLogout={logout}
       />
@@ -113,7 +143,7 @@ const Index = () => {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => setShowSignup(true)}
-              className="rounded-xl bg-raw-gold px-6 py-3 text-sm font-semibold text-raw-black"
+              className="rounded-xl bg-raw-gold px-6 py-3 text-sm font-semibold text-raw-ink"
             >
               Sign In / Sign Up
             </button>

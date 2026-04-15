@@ -91,7 +91,7 @@ export function Globe3DDemoThird() {
           Join founding communities and connect with people who think deeply, feel deeply, and want honest conversation.
         </p>
         <div className="mt-4 flex gap-4 md:mt-8">
-          <button className="flex cursor-pointer items-center justify-center rounded-full bg-raw-gold px-6 py-2 font-semibold text-raw-black transition-all duration-200 hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20 active:scale-98">
+          <button className="flex cursor-pointer items-center justify-center rounded-full bg-raw-gold px-6 py-2 font-semibold text-raw-ink transition-all duration-200 hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20 active:scale-98">
             Join Free
           </button>
           <button className="flex cursor-pointer items-center justify-center rounded-full border border-raw-border px-6 py-2 font-medium text-raw-silver/80 transition-all duration-200 hover:border-raw-silver/30 active:scale-98">

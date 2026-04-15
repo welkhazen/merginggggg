@@ -67,7 +67,7 @@ export function Communities({ onSignupClick }: CommunitiesProps) {
         <div className="mt-10 text-center">
           <button
             onClick={onSignupClick}
-            className="rounded-full bg-raw-gold px-8 py-3.5 text-sm font-bold text-raw-black transition-all hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20"
+            className="rounded-full bg-raw-gold px-8 py-3.5 text-sm font-bold text-raw-ink transition-all hover:bg-raw-gold/90 hover:shadow-lg hover:shadow-raw-gold/20"
           >
             Join the Founding Community
           </button>

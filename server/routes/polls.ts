@@ -1,22 +1,25 @@
+import type { Request } from "express";
 import { Router } from "express";
 import { z } from "zod";
 import { audit } from "../lib/audit";
-import { applyVote, buildBootstrap, canVote, findUserById } from "../lib/store";
+import { applyVote, buildBootstrap, canVote } from "../lib/store";
+import { getUserRepository } from "../lib/userRepository";
 import type { AuthSessionData } from "../types";
 
 const voteBodySchema = z.object({
   optionId: z.string().min(1).max(64),
 });
 
-function getSessionData(req: any): AuthSessionData {
+function getSessionData(req: Request): AuthSessionData {
   return req.session as unknown as AuthSessionData;
 }
 
 export const pollsRouter = Router();
+const userRepository = getUserRepository();
 
-pollsRouter.get("/bootstrap", (req, res) => {
+pollsRouter.get("/bootstrap", async (req, res) => {
   const sessionData = getSessionData(req);
-  const user = sessionData.userId ? findUserById(sessionData.userId) : null;
+  const user = sessionData.userId ? await userRepository.findById(sessionData.userId) : null;
 
   if (sessionData.userId && !user) {
     sessionData.userId = undefined;
@@ -25,14 +28,14 @@ pollsRouter.get("/bootstrap", (req, res) => {
   return res.status(200).json(buildBootstrap(user, sessionData));
 });
 
-pollsRouter.post("/polls/:pollId/vote", (req, res) => {
+pollsRouter.post("/polls/:pollId/vote", async (req, res) => {
   const parsed = voteBodySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid vote payload." });
   }
 
   const sessionData = getSessionData(req);
-  const user = sessionData.userId ? findUserById(sessionData.userId) : null;
+  const user = sessionData.userId ? await userRepository.findById(sessionData.userId) : null;
   const { pollId } = req.params;
 
   const permission = canVote(user, sessionData, pollId);

@@ -32,7 +32,7 @@ const activityFeed = [
     title: "LVL 3 · Mental Wellness",
   },
   {
-    quote: "Marketplace just dropped new avatar themes. The obsidian pack is incredible.",
+    quote: "The new insights tab is wild. My profile report was way too accurate.",
     name: "neon_void",
     title: "LVL 8 · Self-Improvement",
   },

@@ -46,7 +46,7 @@ export function GlareCard({ children, className = "" }: GlareCardProps) {
         className="pointer-events-none absolute inset-0 z-10 transition-opacity duration-300"
         style={{
           opacity: isHovered ? 1 : 0,
-          background: `radial-gradient(circle at ${glarePos.x}% ${glarePos.y}%, rgba(241,196,45,0.15) 0%, rgba(241,196,45,0.04) 40%, transparent 70%)`,
+          background: `radial-gradient(circle at ${glarePos.x}% ${glarePos.y}%, rgb(var(--raw-accent) / 0.15) 0%, rgb(var(--raw-accent) / 0.04) 40%, transparent 70%)`,
         }}
       />
       {/* Content */}

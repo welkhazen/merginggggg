@@ -1,8 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
+import {
+  clearAuthSession,
+  getPersistedUserById,
+  persistAuthSession,
+  readAuthSession,
+  registerOrUpdateUser,
+  type ModerationStatus,
+  type UserRole,
+} from "@/lib/adminData";
 
 export interface User {
   id: string;
   username: string;
+  role: UserRole;
+  moderationStatus: ModerationStatus;
+  warnings: number;
+}
+
+export interface AuthResult {
+  ok: boolean;
+  error?: string;
 }
 
 export interface StytchSession {
@@ -27,12 +44,48 @@ export interface Poll {
 
 export type OnboardingStep = "avatar" | "polls" | "communities" | "marketplace" | "ready";
 
-interface BootstrapResponse {
-  user: User | null;
-  isLoggedIn: boolean;
-  polls: Poll[];
-  votedPollIds: string[];
-  freeVotesUsed: number;
+const DAILY_POLL_LIMIT = 7;
+const DAILY_POLL_PROGRESS_STORAGE_KEY = "raw.poll-daily-progress.v1";
+
+interface PersistedDailyPollProgressEntry {
+  date: string;
+  pollIds: string[];
+}
+
+type PersistedDailyPollProgressMap = Record<string, PersistedDailyPollProgressEntry>;
+
+function getTodayKey(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function readDailyPollProgressMap(): PersistedDailyPollProgressMap {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(DAILY_POLL_PROGRESS_STORAGE_KEY);
+    if (!rawValue) {
+      return {};
+    }
+
+    const parsed = JSON.parse(rawValue) as PersistedDailyPollProgressMap;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDailyPollProgressMap(map: PersistedDailyPollProgressMap): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(DAILY_POLL_PROGRESS_STORAGE_KEY, JSON.stringify(map));
 }
 
 const INITIAL_POLLS: Poll[] = [
@@ -71,17 +124,11 @@ interface PersistedOnboardingEntry {
   completed: boolean;
   step: OnboardingStep;
   answeredPollIds: string[];
-  selectedCommunityId: string | null;
+  selectedCommunityIds?: string[];
+  selectedCommunityId?: string | null;
 }
 
 type PersistedOnboardingMap = Record<string, PersistedOnboardingEntry>;
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
-
-function buildApiUrl(path: string): string {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return API_BASE_URL ? `${API_BASE_URL}${normalizedPath}` : normalizedPath;
-}
 
 function readOnboardingMap(): PersistedOnboardingMap {
   if (typeof window === "undefined") {
@@ -109,58 +156,28 @@ function writeOnboardingMap(map: PersistedOnboardingMap): void {
   window.localStorage.setItem(ONBOARDING_STATE_STORAGE_KEY, JSON.stringify(map));
 }
 
-async function parseApiResponse<T>(response: Response): Promise<T> {
-  let data: unknown = null;
+function toUser(record: NonNullable<ReturnType<typeof getPersistedUserById>>): User {
+  return {
+    id: record.id,
+    username: record.username,
+    role: record.role,
+    moderationStatus: record.moderationStatus,
+    warnings: record.warnings,
+  };
+}
 
-  try {
-    data = await response.json();
-  } catch {
-    data = null;
+function readInitialUser(): User | null {
+  const sessionUserId = readAuthSession();
+  if (!sessionUserId) {
+    return null;
   }
 
-  if (!response.ok) {
-    const message =
-      typeof data === "object" &&
-      data !== null &&
-      "error" in data &&
-      typeof (data as { error?: unknown }).error === "string"
-        ? (data as { error: string }).error
-        : "Request failed.";
-
-    throw new Error(message);
-  }
-
-  return data as T;
-}
-
-async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(buildApiUrl(path), {
-    method: "GET",
-    credentials: "include",
-  });
-
-  return parseApiResponse<T>(response);
-}
-
-async function apiPost<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(buildApiUrl(path), {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  return parseApiResponse<T>(response);
-}
-
-function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  const persistedUser = getPersistedUserById(sessionUserId);
+  return persistedUser ? toUser(persistedUser) : null;
 }
 
 export function useRawStore() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => readInitialUser());
   const [stytchSession, setStytchSession] = useState<StytchSession | null>(null);
   const [polls, setPolls] = useState<Poll[]>(INITIAL_POLLS);
   const [votedPolls, setVotedPolls] = useState<Set<string>>(new Set());
@@ -169,53 +186,72 @@ export function useRawStore() {
   const [freeVotesUsed, setFreeVotesUsed] = useState(0);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>("avatar");
   const [onboardingAnsweredPollIds, setOnboardingAnsweredPollIds] = useState<Set<string>>(new Set());
-  const [onboardingSelectedCommunityId, setOnboardingSelectedCommunityId] = useState<string | null>(null);
+  const [onboardingSelectedCommunityIds, setOnboardingSelectedCommunityIds] = useState<string[]>([]);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [isOnboardingResolved, setIsOnboardingResolved] = useState(false);
+  const [dailyAnsweredPollIds, setDailyAnsweredPollIds] = useState<Set<string>>(new Set());
+  const [dailyPollDate, setDailyPollDate] = useState<string>(getTodayKey());
 
   const isLoggedIn = user !== null || (stytchSession?.authenticated ?? false);
 
-  const syncFromBootstrap = useCallback((payload: BootstrapResponse) => {
-    setUser(payload.user);
-    setPolls(payload.polls);
-    setVotedPolls(new Set(payload.votedPollIds));
-    setFreeVotesUsed(payload.freeVotesUsed);
-  }, []);
+  const refreshPersistedUser = useCallback(() => {
+    const sessionUserId = readAuthSession();
+    if (!sessionUserId) {
+      setUser(null);
+      return;
+    }
 
-  const refreshBootstrap = useCallback(async () => {
-    // Backend disabled — skip bootstrap fetch
+    const persistedUser = getPersistedUserById(sessionUserId);
+    setUser(persistedUser ? toUser(persistedUser) : null);
   }, []);
 
   useEffect(() => {
-    void refreshBootstrap();
-  }, [refreshBootstrap]);
+    refreshPersistedUser();
+    window.addEventListener("focus", refreshPersistedUser);
+
+    return () => {
+      window.removeEventListener("focus", refreshPersistedUser);
+    };
+  }, [refreshPersistedUser]);
 
   useEffect(() => {
     if (!user) {
       setOnboardingStep("avatar");
       setOnboardingAnsweredPollIds(new Set());
-      setOnboardingSelectedCommunityId(null);
+      setOnboardingSelectedCommunityIds([]);
       setOnboardingCompleted(false);
+      setIsOnboardingResolved(true);
       return;
     }
+
+    setIsOnboardingResolved(false);
 
     const onboardingMap = readOnboardingMap();
     const entry = onboardingMap[user.id];
     if (!entry) {
       setOnboardingStep("avatar");
       setOnboardingAnsweredPollIds(new Set());
-      setOnboardingSelectedCommunityId(null);
+      setOnboardingSelectedCommunityIds([]);
       setOnboardingCompleted(false);
+      setIsOnboardingResolved(true);
       return;
     }
 
     setOnboardingStep(entry.step ?? "avatar");
     setOnboardingAnsweredPollIds(new Set(entry.answeredPollIds ?? []));
-    setOnboardingSelectedCommunityId(entry.selectedCommunityId ?? null);
+    if (Array.isArray(entry.selectedCommunityIds)) {
+      setOnboardingSelectedCommunityIds(entry.selectedCommunityIds.slice(0, 2));
+    } else if (typeof entry.selectedCommunityId === "string" && entry.selectedCommunityId.length > 0) {
+      setOnboardingSelectedCommunityIds([entry.selectedCommunityId]);
+    } else {
+      setOnboardingSelectedCommunityIds([]);
+    }
     setOnboardingCompleted(Boolean(entry.completed));
+    setIsOnboardingResolved(true);
   }, [user]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !isOnboardingResolved) {
       return;
     }
 
@@ -224,47 +260,99 @@ export function useRawStore() {
       completed: onboardingCompleted,
       step: onboardingStep,
       answeredPollIds: [...onboardingAnsweredPollIds],
-      selectedCommunityId: onboardingSelectedCommunityId,
+      selectedCommunityIds: onboardingSelectedCommunityIds,
+      selectedCommunityId: onboardingSelectedCommunityIds[0] ?? null,
     };
     writeOnboardingMap(onboardingMap);
-  }, [onboardingAnsweredPollIds, onboardingCompleted, onboardingSelectedCommunityId, onboardingStep, user]);
+  }, [isOnboardingResolved, onboardingAnsweredPollIds, onboardingCompleted, onboardingSelectedCommunityIds, onboardingStep, user]);
 
-  const vote = useCallback(
-    (pollId: string, optionId: string) => {
-      // Backend disabled — update vote state locally
-      setVotedPolls((prev) => new Set([...prev, pollId]));
-      setPolls((prev) =>
-        prev.map((poll) =>
-          poll.id === pollId
-            ? { ...poll, options: poll.options.map((opt) => opt.id === optionId ? { ...opt, votes: opt.votes + 1 } : opt) }
-            : poll
-        )
-      );
-    },
-    []
-  );
+  useEffect(() => {
+    const ownerId = user?.id ?? "guest";
+    const todayKey = getTodayKey();
+    const progressMap = readDailyPollProgressMap();
+    const ownerEntry = progressMap[ownerId];
+
+    if (!ownerEntry || ownerEntry.date !== todayKey) {
+      setDailyPollDate(todayKey);
+      setDailyAnsweredPollIds(new Set());
+      return;
+    }
+
+    setDailyPollDate(ownerEntry.date);
+    setDailyAnsweredPollIds(new Set(ownerEntry.pollIds ?? []));
+  }, [user?.id]);
+
+  useEffect(() => {
+    const ownerId = user?.id ?? "guest";
+    const progressMap = readDailyPollProgressMap();
+    progressMap[ownerId] = {
+      date: dailyPollDate,
+      pollIds: [...dailyAnsweredPollIds],
+    };
+    writeDailyPollProgressMap(progressMap);
+  }, [dailyAnsweredPollIds, dailyPollDate, user?.id]);
+
+  const vote = useCallback((pollId: string, optionId: string) => {
+    const todayKey = getTodayKey();
+    if (dailyPollDate !== todayKey) {
+      setDailyPollDate(todayKey);
+      setDailyAnsweredPollIds(new Set());
+    }
+
+    const currentDailySet = dailyPollDate === todayKey ? dailyAnsweredPollIds : new Set<string>();
+    if (!currentDailySet.has(pollId) && currentDailySet.size >= DAILY_POLL_LIMIT) {
+      return;
+    }
+
+    if (!isLoggedIn) {
+      setFreeVotesUsed((previous) => previous + 1);
+    }
+
+    setVotedPolls((previous) => new Set([...previous, pollId]));
+    setDailyAnsweredPollIds((previous) => {
+      const next = new Set(previous);
+      next.add(pollId);
+      return next;
+    });
+    setPolls((previous) =>
+      previous.map((poll) =>
+        poll.id === pollId
+          ? { ...poll, options: poll.options.map((option) => option.id === optionId ? { ...option, votes: option.votes + 1 } : option) }
+          : poll
+      )
+    );
+  }, [dailyAnsweredPollIds, dailyPollDate, isLoggedIn]);
 
   const requestSignupOtp = useCallback(async (username: string, _password: string, _phone: string): Promise<AuthResult> => {
-    // OTP / Twilio disabled — mock signup locally
-    setUser({ id: `local-${Date.now()}`, username });
+    const registeredUser = registerOrUpdateUser(username);
+    if (registeredUser.moderationStatus === "banned") {
+      return { ok: false, error: "This account has been banned after moderation review." };
+    }
+
+    persistAuthSession(registeredUser.id);
+    setUser(toUser(registeredUser));
     setShowSignup(false);
     return { ok: true };
   }, []);
 
   const verifySignupOtp = useCallback(async (_code: string): Promise<AuthResult> => {
-    // OTP disabled — no-op
     return { ok: true };
   }, []);
 
   const login = useCallback(async (username: string, _password: string): Promise<AuthResult> => {
-    // Backend disabled — mock login locally
-    setUser({ id: `local-${Date.now()}`, username });
+    const registeredUser = registerOrUpdateUser(username);
+    if (registeredUser.moderationStatus === "banned") {
+      return { ok: false, error: "This account has been banned after moderation review." };
+    }
+
+    persistAuthSession(registeredUser.id);
+    setUser(toUser(registeredUser));
     setShowSignup(false);
     return { ok: true };
   }, []);
 
   const logout = useCallback(() => {
-    // Backend disabled — clear user locally
+    clearAuthSession();
     setUser(null);
     setStytchSession(null);
   }, []);
@@ -280,7 +368,7 @@ export function useRawStore() {
   const resetOnboardingProgress = useCallback(() => {
     setOnboardingStep("avatar");
     setOnboardingAnsweredPollIds(new Set());
-    setOnboardingSelectedCommunityId(null);
+    setOnboardingSelectedCommunityIds([]);
     setOnboardingCompleted(false);
   }, []);
 
@@ -291,18 +379,19 @@ export function useRawStore() {
 
   const setSyncStytchSession = useCallback((session: StytchSession | null) => {
     setStytchSession(session);
-    // Optionally create a user object from Stytch email
+
     if (session?.authenticated && session?.email) {
-      setUser({
-        id: session.userId || `stytch-${session.email}`,
-        username: session.email.split('@')[0],
-      });
+      const username = session.email.split("@")[0];
+      const registeredUser = registerOrUpdateUser(username);
+      persistAuthSession(registeredUser.id);
+      setUser(toUser(registeredUser));
     }
   }, []);
 
   return {
     user,
     isLoggedIn,
+    isAdmin: user?.role === "admin",
     stytchSession,
     setStytchSession: setSyncStytchSession,
     polls,
@@ -316,9 +405,13 @@ export function useRawStore() {
     setOnboardingStep,
     onboardingAnsweredPollIds,
     markOnboardingPollAnswered,
-    onboardingSelectedCommunityId,
-    setOnboardingSelectedCommunityId,
+    onboardingSelectedCommunityIds,
+    setOnboardingSelectedCommunityIds,
     onboardingCompleted,
+    isOnboardingResolved,
+    dailyAnsweredCount: dailyAnsweredPollIds.size,
+    dailyPollLimit: DAILY_POLL_LIMIT,
+    isDailyPollLimitReached: dailyAnsweredPollIds.size >= DAILY_POLL_LIMIT,
     completeOnboarding,
     resetOnboardingProgress,
     vote,

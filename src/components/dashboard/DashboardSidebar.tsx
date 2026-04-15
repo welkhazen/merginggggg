@@ -1,22 +1,29 @@
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   Home,
   MessageCircle,
-  ShoppingBag,
+  Sparkles,
   Target,
   Settings,
   HelpCircle,
   Flame,
   LogOut,
+  Plus,
 } from "lucide-react";
-import { AvatarFigure, getAvatarTheme } from "@/components/ui/avatar-figure";
+import { useLocation, useNavigate } from "react-router-dom";
+import { AvatarFigure } from "@/components/ui/avatar-figure";
+import { CommunityBadge } from "@/components/dashboard/CommunityBadge";
+import { countUnreadMessages, joinCommunityChat, readCommunityChats, type PersistedCommunityRecord } from "@/lib/communityChat";
 import type { DashboardTab } from "./DashboardNav";
 
 interface DashboardSidebarProps {
   activeTab: DashboardTab;
   onTabChange: (tab: DashboardTab) => void;
+  userId: string;
   username: string;
   avatarLevel: number;
+  showAdminLink?: boolean;
   onHomeClick: () => void;
   isHome: boolean;
   onLogout: () => void;
@@ -26,7 +33,7 @@ const navItems: { icon: typeof Home; label: string; tab: DashboardTab | "home" }
   { icon: Home, label: "Home", tab: "home" },
   { icon: Target, label: "Polls", tab: "polls" },
   { icon: MessageCircle, label: "Communities", tab: "communities" },
-  { icon: ShoppingBag, label: "Marketplace", tab: "marketplace" },
+  { icon: Sparkles, label: "Insights", tab: "marketplace" },
   { icon: BarChart3, label: "Growth Stats", tab: "profile" },
 ];
 
@@ -35,12 +42,76 @@ const navItems: { icon: typeof Home; label: string; tab: DashboardTab | "home" }
 export function DashboardSidebar({
   activeTab,
   onTabChange,
+  userId,
   username,
   avatarLevel,
+  showAdminLink = false,
   onHomeClick,
   isHome,
   onLogout,
 }: DashboardSidebarProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [communities, setCommunities] = useState<PersistedCommunityRecord[]>(() => readCommunityChats());
+  const [totalJoinedUnread, setTotalJoinedUnread] = useState(0);
+
+  useEffect(() => {
+    const reloadCommunities = () => {
+      setCommunities(readCommunityChats());
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (!event.key || event.key.startsWith("raw.community")) {
+        reloadCommunities();
+      }
+    };
+
+    reloadCommunities();
+    window.addEventListener("focus", reloadCommunities);
+    window.addEventListener("storage", handleStorage);
+    const pollInterval = window.setInterval(reloadCommunities, 3000);
+
+    return () => {
+      window.removeEventListener("focus", reloadCommunities);
+      window.removeEventListener("storage", handleStorage);
+      window.clearInterval(pollInterval);
+    };
+  }, []);
+
+  const quickCommunities = useMemo(() => {
+    const sorted = [...communities].sort((a, b) => {
+      const aJoined = a.members.some((member) => member.userId === userId);
+      const bJoined = b.members.some((member) => member.userId === userId);
+      const aUnread = aJoined ? countUnreadMessages(a, userId) : 0;
+      const bUnread = bJoined ? countUnreadMessages(b, userId) : 0;
+
+      if (aJoined !== bJoined) {
+        return aJoined ? -1 : 1;
+      }
+
+      if (aUnread !== bUnread) {
+        return bUnread - aUnread;
+      }
+
+      return a.title.localeCompare(b.title);
+    });
+
+    return sorted.slice(0, 4);
+  }, [communities, userId]);
+
+  useEffect(() => {
+    const unread = communities.reduce((sum, community) => {
+      const isJoined = community.members.some((member) => member.userId === userId);
+      if (!isJoined) {
+        return sum;
+      }
+
+      return sum + countUnreadMessages(community, userId);
+    }, 0);
+
+    setTotalJoinedUnread(unread);
+  }, [communities, userId]);
+
   return (
     <aside className="fixed left-0 top-14 bottom-0 z-40 hidden w-[200px] flex-col border-r border-raw-border/30 bg-raw-black lg:flex">
       {/* User card */}
@@ -84,6 +155,77 @@ export function DashboardSidebar({
             </button>
           );
         })}
+
+        <div className="mt-5 rounded-2xl border border-raw-border/20 bg-raw-surface/20 p-3">
+          <div className="flex items-center justify-between gap-2 px-1 pb-2">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-raw-silver/35">Fast Join</p>
+              {totalJoinedUnread > 0 && (
+                <span className="rounded-full border border-raw-gold/30 bg-raw-gold/10 px-1.5 py-0.5 text-[9px] font-semibold text-raw-gold">
+                  {totalJoinedUnread}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                onTabChange("communities");
+                navigate("/dashboard");
+              }}
+              className="rounded-full p-1 text-raw-silver/35 transition-colors hover:bg-raw-surface/40 hover:text-raw-gold"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {quickCommunities.map((community) => {
+              const isJoined = community.members.some((member) => member.userId === userId);
+              const unreadCount = isJoined ? countUnreadMessages(community, userId) : 0;
+              const isCommunityActive = location.pathname === `/dashboard/communities/${community.id}`;
+
+              return (
+                <div
+                  key={community.id}
+                  className={`flex items-center gap-2 rounded-xl px-2 py-2 transition-colors ${
+                    isCommunityActive
+                      ? "bg-raw-gold/10 text-raw-gold"
+                      : "hover:bg-raw-surface/40 text-raw-silver/65"
+                  }`}
+                >
+                  <button
+                    onClick={() => navigate(`/dashboard/communities/${community.id}`)}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  >
+                  <CommunityBadge abbr={community.abbr} title={community.title} logoUrl={community.logoUrl} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-xs font-medium">{community.title}</p>
+                      {isJoined && unreadCount > 0 && (
+                        <span className="rounded-full bg-raw-gold px-1.5 py-0.5 text-[9px] font-semibold text-raw-ink">{unreadCount}</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-raw-silver/35">
+                      {isJoined ? (unreadCount > 0 ? "New messages" : "Open chat") : "Quick join"}
+                    </p>
+                  </div>
+                  </button>
+                  {!isJoined && (
+                    <button
+                      onClick={(event) => {
+                        joinCommunityChat(community.id, { userId, username });
+                        setCommunities(readCommunityChats());
+                        navigate(`/dashboard/communities/${community.id}`);
+                      }}
+                      className="rounded-full border border-raw-gold/20 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-raw-gold/75"
+                    >
+                      Join
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </nav>
 
       {/* Streak */}
@@ -97,6 +239,15 @@ export function DashboardSidebar({
 
       {/* Bottom */}
       <div className="border-t border-raw-border/20 p-3 space-y-0.5">
+        {showAdminLink && (
+          <a
+            href="/admin"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs text-raw-gold/75 transition-colors hover:bg-raw-gold/[0.06] hover:text-raw-gold"
+          >
+            <Settings className="h-3.5 w-3.5" />
+            <span>Admin</span>
+          </a>
+        )}
         <button className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-xs text-raw-silver/35 hover:text-raw-silver/60 transition-colors">
           <Settings className="h-3.5 w-3.5" />
           <span>Settings</span>

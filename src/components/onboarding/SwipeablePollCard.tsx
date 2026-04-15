@@ -29,7 +29,6 @@ export function SwipeablePollCard({
 }: SwipeablePollCardProps) {
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -123,7 +122,7 @@ export function SwipeablePollCard({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onMouseDown={handleMouseDown}
-        className={`relative w-full max-w-xl mx-auto rounded-3xl border-2 overflow-hidden transition-all ${
+        className={`relative w-full md:w-[50vw] md:max-w-[760px] mx-auto rounded-3xl border-2 overflow-hidden transition-all ${
           isDragging
             ? "border-raw-gold/60 bg-raw-gold/5 cursor-grabbing shadow-lg shadow-raw-gold/20"
             : "border-raw-border/40 bg-gradient-to-br from-raw-gold/5 to-raw-black/40 cursor-grab hover:border-raw-gold/40"
@@ -254,167 +253,152 @@ export function SwipeablePollCard({
               ✓ Answer captured
             </p>
           )}
-        </div>
-      </div>
 
-      {/* Comments Button to Toggle */}
-      {isAnswered && (
-        <button
-          onClick={() => setShowComments(!showComments)}
-          className="w-full max-w-xl mx-auto block rounded-2xl border-2 border-raw-border/40 bg-raw-black/20 px-6 py-3 text-sm font-semibold text-raw-silver/70 hover:border-raw-gold/50 hover:bg-raw-gold/10 hover:text-raw-gold/80 transition-all"
-        >
-          {showComments ? "▲ Hide" : "▼ Show"} 💬 Comments & Insights ({comments.length})
-        </button>
-      )}
+          {isAnswered && (
+            <div className="mt-6 rounded-2xl border border-raw-border/30 bg-raw-black/35 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-raw-silver/70">
+                  Comments & Insights
+                </p>
+                <span className="rounded-full border border-raw-border/45 bg-raw-black/45 px-2.5 py-1 text-[10px] text-raw-silver/50">
+                  {updatedComments.length}
+                </span>
+              </div>
 
-      {/* Inline Comments Section */}
-      {isAnswered && showComments && (
-        <div className="max-w-xl mx-auto space-y-4">
-          {/* Add Comment Form */}
-          {onAddComment && (
-            <div className="rounded-2xl border border-raw-border/30 bg-raw-black/20 p-4">
-              <textarea
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Share your thoughts on this question..."
-                className="w-full bg-raw-black/40 border border-raw-border/30 rounded-lg px-3 py-2 text-sm text-raw-text placeholder-raw-silver/30 focus:outline-none focus:border-raw-gold/50 resize-none"
-                rows={3}
-              />
-              <button
-                onClick={() => {
-                  if (commentText.trim()) {
-                    onAddComment(commentText);
-                    setCommentText("");
-                  }
-                }}
-                disabled={!commentText.trim()}
-                className="mt-3 w-full rounded-lg bg-raw-gold px-3 py-2 text-xs font-semibold text-raw-black transition-opacity disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
-              >
-                Post Comment
-              </button>
-            </div>
-          )}
+              {onAddComment && (
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder="Add a comment..."
+                    className="flex-1 rounded-full border border-raw-border/35 bg-raw-black/50 px-4 py-2 text-xs text-raw-text placeholder-raw-silver/30 focus:outline-none focus:border-raw-gold/40"
+                  />
+                  <button
+                    onClick={() => {
+                      if (commentText.trim()) {
+                        onAddComment(commentText);
+                        setCommentText("");
+                      }
+                    }}
+                    disabled={!commentText.trim()}
+                    className="rounded-full border border-raw-border/40 bg-raw-surface/55 px-3 py-2 text-[11px] font-semibold text-raw-silver/75 transition-all hover:border-raw-gold/40 hover:text-raw-gold disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Send
+                  </button>
+                </div>
+              )}
 
-          {/* Comments List */}
-          {updatedComments.length > 0 ? (
-            <div className="space-y-4">
-              {updatedComments.map((comment) => (
-                <div
-                  key={comment.id}
-                  className="rounded-2xl border border-raw-border/30 bg-gradient-to-br from-raw-gold/5 to-raw-black/20 p-4 space-y-3"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-raw-gold/20 border border-raw-gold/30 flex items-center justify-center text-xs font-bold">
-                      {comment.avatar}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-raw-text">
-                          {comment.isAnonymous ? "Anonymous" : comment.author}
-                        </span>
-                        <span className="text-[9px] text-raw-silver/40">{comment.timestamp}</span>
-                      </div>
-                      <p className="mt-2 text-xs text-raw-silver/75 leading-relaxed">{comment.content}</p>
-                      <div className="mt-2 flex items-center gap-3">
-                        <button className="text-xs text-raw-silver/50 hover:text-raw-gold/70 transition-colors">
-                          👍 {comment.likes > 0 && comment.likes}
-                        </button>
-                        <button 
-                          onClick={() => setReplyingToId(replyingToId === comment.id ? null : comment.id)}
-                          className="text-xs text-raw-silver/50 hover:text-raw-gold/70 transition-colors"
-                        >
-                          💬 Reply
-                        </button>
-                      </div>
-
-                      {/* Reply Input Form */}
-                      {replyingToId === comment.id && (
-                        <div className="mt-4 space-y-2 rounded-xl border border-raw-border/30 bg-raw-black/30 p-3">
-                          <textarea
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            placeholder="Write a reply..."
-                            className="w-full bg-raw-black/40 border border-raw-border/30 rounded-lg px-2.5 py-2 text-xs text-raw-text placeholder-raw-silver/30 focus:outline-none focus:border-raw-gold/50 resize-none"
-                            rows={2}
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                if (replyText.trim()) {
-                                  const newReply: Comment = {
-                                    id: `${comment.id}-reply-${Date.now()}`,
-                                    author: "You",
-                                    avatar: 5,
-                                    content: replyText,
-                                    timestamp: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-                                    likes: 0,
-                                    replies: [],
-                                    isAnonymous: false,
-                                  };
-                                  setUpdatedComments((prev) =>
-                                    prev.map((c) =>
-                                      c.id === comment.id
-                                        ? { ...c, replies: [...(c.replies || []), newReply] }
-                                        : c
-                                    )
-                                  );
-                                  setReplyText("");
-                                  setReplyingToId(null);
-                                }
-                              }}
-                              disabled={!replyText.trim()}
-                              className="flex-1 rounded-lg bg-raw-gold px-2.5 py-1.5 text-[10px] font-semibold text-raw-black transition-opacity disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
-                            >
-                              Post Reply
+              <div className="mt-4 space-y-3 max-h-64 overflow-y-auto pr-1">
+                {updatedComments.length > 0 ? (
+                  updatedComments.map((comment) => (
+                    <div
+                      key={comment.id}
+                      className="rounded-2xl border border-raw-border/35 bg-raw-black/45 px-4 py-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-7 h-7 rounded-full bg-raw-surface border border-raw-border/35 flex items-center justify-center text-[10px] font-bold">
+                          {comment.avatar}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-semibold text-raw-silver/85 truncate">
+                              {comment.isAnonymous ? "Anonymous" : comment.author}
+                            </p>
+                            <span className="text-[10px] text-raw-silver/40">{comment.timestamp}</span>
+                          </div>
+                          <p className="mt-1.5 text-xs text-raw-silver/70 leading-relaxed">{comment.content}</p>
+                          <div className="mt-2 flex items-center gap-3">
+                            <button className="text-[11px] text-raw-silver/45 hover:text-raw-gold/70 transition-colors">
+                              ↑ {comment.likes > 0 ? comment.likes : 0}
                             </button>
                             <button
-                              onClick={() => {
-                                setReplyingToId(null);
-                                setReplyText("");
-                              }}
-                              className="flex-1 rounded-lg border border-raw-border/30 bg-raw-black/20 px-2.5 py-1.5 text-[10px] font-semibold text-raw-silver/70 hover:border-raw-gold/50 transition-all"
+                              onClick={() => setReplyingToId(replyingToId === comment.id ? null : comment.id)}
+                              className="text-[11px] text-raw-silver/45 hover:text-raw-gold/70 transition-colors"
                             >
-                              Cancel
+                              Reply
                             </button>
                           </div>
-                        </div>
-                      )}
 
-                      {/* Nested Replies */}
-                      {comment.replies && comment.replies.length > 0 && (
-                        <div className="mt-4 ml-4 space-y-3 border-l-2 border-raw-gold/20 pl-4">
-                          {comment.replies.map((reply) => (
-                            <div key={reply.id} className="text-[10px]">
-                              <div className="flex items-start gap-2">
-                                <div className="w-6 h-6 rounded-full bg-raw-gold/15 border border-raw-gold/20 flex items-center justify-center text-[8px] font-bold flex-shrink-0 mt-0.5">
-                                  ↳
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-semibold text-raw-silver/80 text-[9px]">
-                                      {reply.isAnonymous ? "Anonymous" : reply.author}
-                                    </span>
-                                    <span className="text-[7px] text-raw-silver/40">{reply.timestamp}</span>
-                                  </div>
-                                  <p className="mt-1 text-raw-silver/65 leading-relaxed">{reply.content}</p>
-                                </div>
+                          {replyingToId === comment.id && (
+                            <div className="mt-3 space-y-2 rounded-xl border border-raw-border/30 bg-raw-black/35 p-3">
+                              <input
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                placeholder="Write a reply..."
+                                className="w-full rounded-lg border border-raw-border/30 bg-raw-black/55 px-3 py-2 text-xs text-raw-text placeholder-raw-silver/35 focus:outline-none focus:border-raw-gold/45"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    if (replyText.trim()) {
+                                      const newReply: Comment = {
+                                        id: `${comment.id}-reply-${Date.now()}`,
+                                        author: "You",
+                                        avatar: 5,
+                                        content: replyText,
+                                        timestamp: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+                                        likes: 0,
+                                        replies: [],
+                                        isAnonymous: false,
+                                      };
+                                      setUpdatedComments((prev) =>
+                                        prev.map((c) =>
+                                          c.id === comment.id
+                                            ? { ...c, replies: [...(c.replies || []), newReply] }
+                                            : c
+                                        )
+                                      );
+                                      setReplyText("");
+                                      setReplyingToId(null);
+                                    }
+                                  }}
+                                  disabled={!replyText.trim()}
+                                  className="flex-1 rounded-lg bg-raw-gold px-3 py-1.5 text-[10px] font-semibold text-raw-ink transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  Post Reply
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setReplyingToId(null);
+                                    setReplyText("");
+                                  }}
+                                  className="flex-1 rounded-lg border border-raw-border/35 bg-raw-black/45 px-3 py-1.5 text-[10px] font-semibold text-raw-silver/65"
+                                >
+                                  Cancel
+                                </button>
                               </div>
                             </div>
-                          ))}
+                          )}
+
+                          {comment.replies && comment.replies.length > 0 && (
+                            <div className="mt-3 ml-2 space-y-2 border-l border-raw-border/40 pl-3">
+                              {comment.replies.map((reply) => (
+                                <div key={reply.id} className="rounded-lg bg-raw-black/35 px-3 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-semibold text-raw-silver/75">
+                                      {reply.isAnonymous ? "Anonymous" : reply.author}
+                                    </span>
+                                    <span className="text-[9px] text-raw-silver/40">{reply.timestamp}</span>
+                                  </div>
+                                  <p className="mt-1 text-[11px] text-raw-silver/65">{reply.content}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-raw-border/25 bg-raw-black/25 px-4 py-5 text-center">
+                    <p className="text-xs text-raw-silver/40">No comments yet. Be the first to share.</p>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-raw-border/20 bg-raw-black/10 px-4 py-6 text-center">
-              <p className="text-xs text-raw-silver/40">No comments yet. Be the first to share!</p>
+                )}
+              </div>
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

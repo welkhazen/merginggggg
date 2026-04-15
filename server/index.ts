@@ -8,6 +8,7 @@ import session from "express-session";
 import { env } from "./config/env";
 import { authRouter } from "./routes/auth";
 import { pollsRouter } from "./routes/polls";
+import { usersRouter } from "./routes/users";
 
 const app = express();
 const isProduction = env.NODE_ENV === "production";
@@ -82,6 +83,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/users", usersRouter);
 app.use("/api", pollsRouter);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
