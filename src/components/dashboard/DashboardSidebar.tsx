@@ -1,20 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart3,
   Home,
   MessageCircle,
-  Sparkles,
+  Dices,
   Target,
+  Trophy,
   Settings,
   HelpCircle,
   Flame,
   LogOut,
-  Plus,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AvatarFigure } from "@/components/ui/avatar-figure";
 import { CommunityBadge } from "@/components/dashboard/CommunityBadge";
-import { countUnreadMessages, joinCommunityChat, readCommunityChats, type PersistedCommunityRecord } from "@/lib/communityChat";
+import { countUnreadMessages, readCommunityChats, type PersistedCommunityRecord } from "@/lib/communityChat";
 import type { DashboardTab } from "./DashboardNav";
 
 interface DashboardSidebarProps {
@@ -32,9 +31,9 @@ interface DashboardSidebarProps {
 const navItems: { icon: typeof Home; label: string; tab: DashboardTab | "home" }[] = [
   { icon: Home, label: "Home", tab: "home" },
   { icon: Target, label: "Polls", tab: "polls" },
+  { icon: Trophy, label: "Challenges", tab: "challenges" },
+  { icon: Dices, label: "Daily Spin", tab: "daily-spin" },
   { icon: MessageCircle, label: "Communities", tab: "communities" },
-  { icon: Sparkles, label: "Insights", tab: "marketplace" },
-  { icon: BarChart3, label: "Growth Stats", tab: "profile" },
 ];
 
 // Avatar colors now come from AvatarFigure component
@@ -85,8 +84,16 @@ export function DashboardSidebar({
       const aUnread = aJoined ? countUnreadMessages(a, userId) : 0;
       const bUnread = bJoined ? countUnreadMessages(b, userId) : 0;
 
-      if (aJoined !== bJoined) {
-        return aJoined ? -1 : 1;
+      if (!aJoined && !bJoined) {
+        return 0;
+      }
+
+      if (!aJoined) {
+        return 1;
+      }
+
+      if (!bJoined) {
+        return -1;
       }
 
       if (aUnread !== bUnread) {
@@ -96,7 +103,7 @@ export function DashboardSidebar({
       return a.title.localeCompare(b.title);
     });
 
-    return sorted.slice(0, 4);
+    return sorted.filter((community) => community.members.some((member) => member.userId === userId)).slice(0, 4);
   }, [communities, userId]);
 
   useEffect(() => {
@@ -129,52 +136,46 @@ export function DashboardSidebar({
 
       {/* Nav items */}
       <nav className="flex-1 px-3 py-2 space-y-0.5">
-        {navItems.map((item) => {
-          const isActive =
-            (item.tab === "home" && isHome) ||
-            (item.tab !== "home" && activeTab === item.tab && !isHome);
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.label}
-              onClick={() => {
-                if (item.tab === "home") {
-                  onHomeClick();
-                } else {
-                  onTabChange(item.tab as DashboardTab);
-                }
-              }}
-              className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${
-                isActive
-                  ? "bg-raw-gold/10 text-raw-gold border border-raw-gold/20"
-                  : "text-raw-silver/50 hover:text-raw-silver/80 hover:bg-raw-surface/50 border border-transparent"
-              }`}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
+        <div className="flex flex-col items-center gap-3 py-2">
+          {navItems.map((item) => {
+            const isActive =
+              (item.tab === "home" && isHome) ||
+              (item.tab !== "home" && activeTab === item.tab && !isHome);
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.label}
+                title={item.label}
+                aria-label={item.label}
+                onClick={() => {
+                  if (item.tab === "home") {
+                    onHomeClick();
+                  } else {
+                    onTabChange(item.tab as DashboardTab);
+                  }
+                }}
+                className={`group relative flex h-10 w-10 items-center justify-center rounded-full border text-sm transition-all duration-200 ease-out backdrop-blur-md ${
+                  isActive
+                    ? "border-violet-300/35 bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.2),rgba(130,145,255,0.12)_45%,rgba(20,26,42,0.68)_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_10px_24px_rgba(108,124,255,0.4),0_0_0_1px_rgba(153,166,255,0.18)]"
+                    : "border-white/12 bg-white/[0.07] text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_8px_18px_rgba(6,10,24,0.35)] hover:scale-105 hover:border-violet-300/25 hover:text-slate-100 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_10px_24px_rgba(108,124,255,0.34),0_0_16px_rgba(126,141,255,0.32)]"
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+              </button>
+            );
+          })}
+        </div>
 
         <div className="mt-5 rounded-2xl border border-raw-border/20 bg-raw-surface/20 p-3">
           <div className="flex items-center justify-between gap-2 px-1 pb-2">
             <div className="flex items-center gap-1.5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-raw-silver/35">Fast Join</p>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-raw-silver/35">Your Communities</p>
               {totalJoinedUnread > 0 && (
                 <span className="rounded-full border border-raw-gold/30 bg-raw-gold/10 px-1.5 py-0.5 text-[9px] font-semibold text-raw-gold">
                   {totalJoinedUnread}
                 </span>
               )}
             </div>
-            <button
-              onClick={() => {
-                onTabChange("communities");
-                navigate("/dashboard");
-              }}
-              className="rounded-full p-1 text-raw-silver/35 transition-colors hover:bg-raw-surface/40 hover:text-raw-gold"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
           </div>
 
           <div className="space-y-2">
@@ -205,25 +206,18 @@ export function DashboardSidebar({
                       )}
                     </div>
                     <p className="text-[10px] text-raw-silver/35">
-                      {isJoined ? (unreadCount > 0 ? "New messages" : "Open chat") : "Quick join"}
+                      {unreadCount > 0 ? "New messages" : "Open chat"}
                     </p>
                   </div>
                   </button>
-                  {!isJoined && (
-                    <button
-                      onClick={(event) => {
-                        joinCommunityChat(community.id, { userId, username });
-                        setCommunities(readCommunityChats());
-                        navigate(`/dashboard/communities/${community.id}`);
-                      }}
-                      className="rounded-full border border-raw-gold/20 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-raw-gold/75"
-                    >
-                      Join
-                    </button>
-                  )}
                 </div>
               );
             })}
+            {quickCommunities.length === 0 && (
+              <div className="rounded-xl border border-dashed border-raw-border/35 px-3 py-3 text-center text-[11px] text-raw-silver/45">
+                No joined communities yet.
+              </div>
+            )}
           </div>
         </div>
       </nav>

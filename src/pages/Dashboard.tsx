@@ -6,7 +6,8 @@ import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { DashboardPolls } from "@/components/dashboard/DashboardPolls";
 import { DashboardCommunities } from "@/components/dashboard/DashboardCommunities";
-import { DashboardMarketplace } from "@/components/dashboard/DashboardMarketplace";
+import { DashboardChallenges } from "@/components/dashboard/DashboardChallenges";
+import { DashboardDailySpin } from "@/components/dashboard/DashboardDailySpin";
 import { DashboardProfile } from "@/components/dashboard/DashboardProfile";
 import type { User, Poll } from "@/store/useRawStore";
 
@@ -77,6 +78,12 @@ export default function Dashboard({
     navigate("/dashboard");
   };
 
+  const handleProfileClick = () => {
+    setActiveTab("profile");
+    setIsHome(false);
+    navigate("/dashboard");
+  };
+
   const renderContent = () => {
     if (isHome) {
       return (
@@ -96,6 +103,7 @@ export default function Dashboard({
           <DashboardPolls
             polls={polls}
             votedPolls={votedPolls}
+            avatarLevel={avatarLevel}
             userId={user.id}
             username={user.username}
             dailyAnsweredCount={dailyAnsweredCount}
@@ -113,8 +121,17 @@ export default function Dashboard({
             onBackToCommunities={handleBackToCommunities}
           />
         );
-      case "marketplace":
-        return <DashboardMarketplace avatarLevel={avatarLevel} pollsAnswered={votedPolls.size} />;
+      case "challenges":
+        return (
+          <DashboardChallenges
+            avatarLevel={avatarLevel}
+            pollsAnswered={votedPolls.size}
+            dailyAnsweredCount={dailyAnsweredCount}
+            dailyPollLimit={dailyPollLimit}
+          />
+        );
+      case "daily-spin":
+        return <DashboardDailySpin userId={user.id} />;
       case "profile":
         return (
           <DashboardProfile
@@ -132,11 +149,10 @@ export default function Dashboard({
   return (
     <div className="min-h-screen bg-raw-black">
       <DashboardNav
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
         username={user.username}
         avatarLevel={avatarLevel}
         showAdminLink={user.role === "admin"}
+        onProfileClick={handleProfileClick}
         onLogout={onLogout}
       />
 
@@ -156,8 +172,9 @@ export default function Dashboard({
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-raw-border/30 bg-raw-black/95 backdrop-blur-xl px-2 py-2 flex items-center justify-around lg:hidden">
         <MobileNavBtn label="Home" active={isHome} onClick={handleHomeClick} />
         <MobileNavBtn label="Polls" active={!isHome && activeTab === "polls"} onClick={() => handleTabChange("polls")} />
+        <MobileNavBtn label="Challenges" active={!isHome && activeTab === "challenges"} onClick={() => handleTabChange("challenges")} />
+        <MobileNavBtn label="Spin" active={!isHome && activeTab === "daily-spin"} onClick={() => handleTabChange("daily-spin")} />
         <MobileNavBtn label="Groups" active={!isHome && activeTab === "communities"} onClick={() => handleTabChange("communities")} />
-        <MobileNavBtn label="Insights" active={!isHome && activeTab === "marketplace"} onClick={() => handleTabChange("marketplace")} />
         <MobileNavBtn label="Me" active={!isHome && activeTab === "profile"} onClick={() => handleTabChange("profile")} />
         {user.role === "admin" && <MobileNavLink label="Admin" href="/admin" icon={<Shield className="h-3.5 w-3.5" />} />}
         <MobileNavBtn label="Logout" active={false} onClick={onLogout} icon={<LogOut className="h-3.5 w-3.5" />} />
