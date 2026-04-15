@@ -1,6 +1,11 @@
 export interface User {
   id: string;
   username: string;
+  displayName: string | null;
+  bio: string | null;
+  createdAt: number;
+  updatedAt: number;
+  passwordChangedAt: number;
 }
 
 export interface UserRecord extends User {

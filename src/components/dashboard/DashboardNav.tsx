@@ -15,7 +15,7 @@ interface DashboardNavProps {
 const tabs: { label: string; value: DashboardTab }[] = [
   { label: "Polls", value: "polls" },
   { label: "Communities", value: "communities" },
-  { label: "Marketplace", value: "marketplace" },
+  { label: "Insights", value: "marketplace" },
   { label: "Profile", value: "profile" },
 ];
 

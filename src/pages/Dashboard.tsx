@@ -16,6 +16,9 @@ interface DashboardProps {
   votedPolls: Set<string>;
   avatarLevel: number;
   setAvatarLevel: (level: number) => void;
+  dailyAnsweredCount: number;
+  dailyPollLimit: number;
+  isDailyPollLimitReached: boolean;
   vote: (pollId: string, optionId: string) => void;
   onLogout: () => void;
 }
@@ -26,6 +29,9 @@ export default function Dashboard({
   votedPolls,
   avatarLevel,
   setAvatarLevel,
+  dailyAnsweredCount,
+  dailyPollLimit,
+  isDailyPollLimitReached,
   vote,
   onLogout,
 }: DashboardProps) {
@@ -90,6 +96,11 @@ export default function Dashboard({
           <DashboardPolls
             polls={polls}
             votedPolls={votedPolls}
+            userId={user.id}
+            username={user.username}
+            dailyAnsweredCount={dailyAnsweredCount}
+            dailyPollLimit={dailyPollLimit}
+            isDailyPollLimitReached={isDailyPollLimitReached}
             onVote={vote}
           />
         );
@@ -103,7 +114,7 @@ export default function Dashboard({
           />
         );
       case "marketplace":
-        return <DashboardMarketplace avatarLevel={avatarLevel} />;
+        return <DashboardMarketplace avatarLevel={avatarLevel} pollsAnswered={votedPolls.size} />;
       case "profile":
         return (
           <DashboardProfile
@@ -146,7 +157,7 @@ export default function Dashboard({
         <MobileNavBtn label="Home" active={isHome} onClick={handleHomeClick} />
         <MobileNavBtn label="Polls" active={!isHome && activeTab === "polls"} onClick={() => handleTabChange("polls")} />
         <MobileNavBtn label="Groups" active={!isHome && activeTab === "communities"} onClick={() => handleTabChange("communities")} />
-        <MobileNavBtn label="Shop" active={!isHome && activeTab === "marketplace"} onClick={() => handleTabChange("marketplace")} />
+        <MobileNavBtn label="Insights" active={!isHome && activeTab === "marketplace"} onClick={() => handleTabChange("marketplace")} />
         <MobileNavBtn label="Me" active={!isHome && activeTab === "profile"} onClick={() => handleTabChange("profile")} />
         {user.role === "admin" && <MobileNavLink label="Admin" href="/admin" icon={<Shield className="h-3.5 w-3.5" />} />}
         <MobileNavBtn label="Logout" active={false} onClick={onLogout} icon={<LogOut className="h-3.5 w-3.5" />} />

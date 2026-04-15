@@ -134,7 +134,7 @@ export function DashboardCommunities({
     const canEditSelectedCommunity = selectedCommunity ? canManageCommunity(selectedCommunity, user.id, user.username) : false;
     const onlineNow = selectedCommunity ? countOnlineMembers(selectedCommunity) : 0;
     const visibleMembers = selectedCommunity?.members.slice(0, 5) ?? [];
-    const unreadCount = selectedCommunity ? countUnreadMessages(selectedCommunity, user.id) : 0;
+    const unreadCount = selectedCommunity && isJoined ? countUnreadMessages(selectedCommunity, user.id) : 0;
 
     const activeMessages = selectedCommunity?.messages ?? [];
     const filteredMessages = useMemo(() => {
@@ -507,7 +507,7 @@ export function DashboardCommunities({
           {communities.map((community) => {
             const joined = community.members.some((member) => member.userId === user.id);
             const previewMessage = community.messages.at(-1);
-            const communityUnreadCount = countUnreadMessages(community, user.id);
+            const communityUnreadCount = joined ? countUnreadMessages(community, user.id) : 0;
 
             return (
               <div key={community.id} className="rounded-3xl border border-raw-border/30 bg-raw-surface/30 p-5">

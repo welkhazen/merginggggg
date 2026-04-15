@@ -44,6 +44,50 @@ export interface Poll {
 
 export type OnboardingStep = "avatar" | "polls" | "communities" | "marketplace" | "ready";
 
+const DAILY_POLL_LIMIT = 7;
+const DAILY_POLL_PROGRESS_STORAGE_KEY = "raw.poll-daily-progress.v1";
+
+interface PersistedDailyPollProgressEntry {
+  date: string;
+  pollIds: string[];
+}
+
+type PersistedDailyPollProgressMap = Record<string, PersistedDailyPollProgressEntry>;
+
+function getTodayKey(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function readDailyPollProgressMap(): PersistedDailyPollProgressMap {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(DAILY_POLL_PROGRESS_STORAGE_KEY);
+    if (!rawValue) {
+      return {};
+    }
+
+    const parsed = JSON.parse(rawValue) as PersistedDailyPollProgressMap;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDailyPollProgressMap(map: PersistedDailyPollProgressMap): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(DAILY_POLL_PROGRESS_STORAGE_KEY, JSON.stringify(map));
+}
+
 const INITIAL_POLLS: Poll[] = [
   {
     id: "poll-1",
@@ -80,7 +124,8 @@ interface PersistedOnboardingEntry {
   completed: boolean;
   step: OnboardingStep;
   answeredPollIds: string[];
-  selectedCommunityId: string | null;
+  selectedCommunityIds?: string[];
+  selectedCommunityId?: string | null;
 }
 
 type PersistedOnboardingMap = Record<string, PersistedOnboardingEntry>;
@@ -141,9 +186,11 @@ export function useRawStore() {
   const [freeVotesUsed, setFreeVotesUsed] = useState(0);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>("avatar");
   const [onboardingAnsweredPollIds, setOnboardingAnsweredPollIds] = useState<Set<string>>(new Set());
-  const [onboardingSelectedCommunityId, setOnboardingSelectedCommunityId] = useState<string | null>(null);
+  const [onboardingSelectedCommunityIds, setOnboardingSelectedCommunityIds] = useState<string[]>([]);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [isOnboardingResolved, setIsOnboardingResolved] = useState(false);
+  const [dailyAnsweredPollIds, setDailyAnsweredPollIds] = useState<Set<string>>(new Set());
+  const [dailyPollDate, setDailyPollDate] = useState<string>(getTodayKey());
 
   const isLoggedIn = user !== null || (stytchSession?.authenticated ?? false);
 
@@ -171,7 +218,7 @@ export function useRawStore() {
     if (!user) {
       setOnboardingStep("avatar");
       setOnboardingAnsweredPollIds(new Set());
-      setOnboardingSelectedCommunityId(null);
+      setOnboardingSelectedCommunityIds([]);
       setOnboardingCompleted(false);
       setIsOnboardingResolved(true);
       return;
@@ -184,7 +231,7 @@ export function useRawStore() {
     if (!entry) {
       setOnboardingStep("avatar");
       setOnboardingAnsweredPollIds(new Set());
-      setOnboardingSelectedCommunityId(null);
+      setOnboardingSelectedCommunityIds([]);
       setOnboardingCompleted(false);
       setIsOnboardingResolved(true);
       return;
@@ -192,7 +239,13 @@ export function useRawStore() {
 
     setOnboardingStep(entry.step ?? "avatar");
     setOnboardingAnsweredPollIds(new Set(entry.answeredPollIds ?? []));
-    setOnboardingSelectedCommunityId(entry.selectedCommunityId ?? null);
+    if (Array.isArray(entry.selectedCommunityIds)) {
+      setOnboardingSelectedCommunityIds(entry.selectedCommunityIds.slice(0, 2));
+    } else if (typeof entry.selectedCommunityId === "string" && entry.selectedCommunityId.length > 0) {
+      setOnboardingSelectedCommunityIds([entry.selectedCommunityId]);
+    } else {
+      setOnboardingSelectedCommunityIds([]);
+    }
     setOnboardingCompleted(Boolean(entry.completed));
     setIsOnboardingResolved(true);
   }, [user]);
@@ -207,13 +260,60 @@ export function useRawStore() {
       completed: onboardingCompleted,
       step: onboardingStep,
       answeredPollIds: [...onboardingAnsweredPollIds],
-      selectedCommunityId: onboardingSelectedCommunityId,
+      selectedCommunityIds: onboardingSelectedCommunityIds,
+      selectedCommunityId: onboardingSelectedCommunityIds[0] ?? null,
     };
     writeOnboardingMap(onboardingMap);
-  }, [isOnboardingResolved, onboardingAnsweredPollIds, onboardingCompleted, onboardingSelectedCommunityId, onboardingStep, user]);
+  }, [isOnboardingResolved, onboardingAnsweredPollIds, onboardingCompleted, onboardingSelectedCommunityIds, onboardingStep, user]);
+
+  useEffect(() => {
+    const ownerId = user?.id ?? "guest";
+    const todayKey = getTodayKey();
+    const progressMap = readDailyPollProgressMap();
+    const ownerEntry = progressMap[ownerId];
+
+    if (!ownerEntry || ownerEntry.date !== todayKey) {
+      setDailyPollDate(todayKey);
+      setDailyAnsweredPollIds(new Set());
+      return;
+    }
+
+    setDailyPollDate(ownerEntry.date);
+    setDailyAnsweredPollIds(new Set(ownerEntry.pollIds ?? []));
+  }, [user?.id]);
+
+  useEffect(() => {
+    const ownerId = user?.id ?? "guest";
+    const progressMap = readDailyPollProgressMap();
+    progressMap[ownerId] = {
+      date: dailyPollDate,
+      pollIds: [...dailyAnsweredPollIds],
+    };
+    writeDailyPollProgressMap(progressMap);
+  }, [dailyAnsweredPollIds, dailyPollDate, user?.id]);
 
   const vote = useCallback((pollId: string, optionId: string) => {
+    const todayKey = getTodayKey();
+    if (dailyPollDate !== todayKey) {
+      setDailyPollDate(todayKey);
+      setDailyAnsweredPollIds(new Set());
+    }
+
+    const currentDailySet = dailyPollDate === todayKey ? dailyAnsweredPollIds : new Set<string>();
+    if (!currentDailySet.has(pollId) && currentDailySet.size >= DAILY_POLL_LIMIT) {
+      return;
+    }
+
+    if (!isLoggedIn) {
+      setFreeVotesUsed((previous) => previous + 1);
+    }
+
     setVotedPolls((previous) => new Set([...previous, pollId]));
+    setDailyAnsweredPollIds((previous) => {
+      const next = new Set(previous);
+      next.add(pollId);
+      return next;
+    });
     setPolls((previous) =>
       previous.map((poll) =>
         poll.id === pollId
@@ -221,7 +321,7 @@ export function useRawStore() {
           : poll
       )
     );
-  }, []);
+  }, [dailyAnsweredPollIds, dailyPollDate, isLoggedIn]);
 
   const requestSignupOtp = useCallback(async (username: string, _password: string, _phone: string): Promise<AuthResult> => {
     const registeredUser = registerOrUpdateUser(username);
@@ -268,7 +368,7 @@ export function useRawStore() {
   const resetOnboardingProgress = useCallback(() => {
     setOnboardingStep("avatar");
     setOnboardingAnsweredPollIds(new Set());
-    setOnboardingSelectedCommunityId(null);
+    setOnboardingSelectedCommunityIds([]);
     setOnboardingCompleted(false);
   }, []);
 
@@ -305,10 +405,13 @@ export function useRawStore() {
     setOnboardingStep,
     onboardingAnsweredPollIds,
     markOnboardingPollAnswered,
-    onboardingSelectedCommunityId,
-    setOnboardingSelectedCommunityId,
+    onboardingSelectedCommunityIds,
+    setOnboardingSelectedCommunityIds,
     onboardingCompleted,
     isOnboardingResolved,
+    dailyAnsweredCount: dailyAnsweredPollIds.size,
+    dailyPollLimit: DAILY_POLL_LIMIT,
+    isDailyPollLimitReached: dailyAnsweredPollIds.size >= DAILY_POLL_LIMIT,
     completeOnboarding,
     resetOnboardingProgress,
     vote,

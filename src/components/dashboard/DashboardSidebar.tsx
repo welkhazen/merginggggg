@@ -3,7 +3,7 @@ import {
   BarChart3,
   Home,
   MessageCircle,
-  ShoppingBag,
+  Sparkles,
   Target,
   Settings,
   HelpCircle,
@@ -33,7 +33,7 @@ const navItems: { icon: typeof Home; label: string; tab: DashboardTab | "home" }
   { icon: Home, label: "Home", tab: "home" },
   { icon: Target, label: "Polls", tab: "polls" },
   { icon: MessageCircle, label: "Communities", tab: "communities" },
-  { icon: ShoppingBag, label: "Marketplace", tab: "marketplace" },
+  { icon: Sparkles, label: "Insights", tab: "marketplace" },
   { icon: BarChart3, label: "Growth Stats", tab: "profile" },
 ];
 
@@ -53,6 +53,7 @@ export function DashboardSidebar({
   const navigate = useNavigate();
   const location = useLocation();
   const [communities, setCommunities] = useState<PersistedCommunityRecord[]>(() => readCommunityChats());
+  const [totalJoinedUnread, setTotalJoinedUnread] = useState(0);
 
   useEffect(() => {
     const reloadCommunities = () => {
@@ -68,14 +69,48 @@ export function DashboardSidebar({
     reloadCommunities();
     window.addEventListener("focus", reloadCommunities);
     window.addEventListener("storage", handleStorage);
+    const pollInterval = window.setInterval(reloadCommunities, 3000);
 
     return () => {
       window.removeEventListener("focus", reloadCommunities);
       window.removeEventListener("storage", handleStorage);
+      window.clearInterval(pollInterval);
     };
   }, []);
 
-  const quickCommunities = useMemo(() => communities.slice(0, 4), [communities]);
+  const quickCommunities = useMemo(() => {
+    const sorted = [...communities].sort((a, b) => {
+      const aJoined = a.members.some((member) => member.userId === userId);
+      const bJoined = b.members.some((member) => member.userId === userId);
+      const aUnread = aJoined ? countUnreadMessages(a, userId) : 0;
+      const bUnread = bJoined ? countUnreadMessages(b, userId) : 0;
+
+      if (aJoined !== bJoined) {
+        return aJoined ? -1 : 1;
+      }
+
+      if (aUnread !== bUnread) {
+        return bUnread - aUnread;
+      }
+
+      return a.title.localeCompare(b.title);
+    });
+
+    return sorted.slice(0, 4);
+  }, [communities, userId]);
+
+  useEffect(() => {
+    const unread = communities.reduce((sum, community) => {
+      const isJoined = community.members.some((member) => member.userId === userId);
+      if (!isJoined) {
+        return sum;
+      }
+
+      return sum + countUnreadMessages(community, userId);
+    }, 0);
+
+    setTotalJoinedUnread(unread);
+  }, [communities, userId]);
 
   return (
     <aside className="fixed left-0 top-14 bottom-0 z-40 hidden w-[200px] flex-col border-r border-raw-border/30 bg-raw-black lg:flex">
@@ -123,7 +158,14 @@ export function DashboardSidebar({
 
         <div className="mt-5 rounded-2xl border border-raw-border/20 bg-raw-surface/20 p-3">
           <div className="flex items-center justify-between gap-2 px-1 pb-2">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-raw-silver/35">Fast Join</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-raw-silver/35">Fast Join</p>
+              {totalJoinedUnread > 0 && (
+                <span className="rounded-full border border-raw-gold/30 bg-raw-gold/10 px-1.5 py-0.5 text-[9px] font-semibold text-raw-gold">
+                  {totalJoinedUnread}
+                </span>
+              )}
+            </div>
             <button
               onClick={() => {
                 onTabChange("communities");
@@ -138,7 +180,7 @@ export function DashboardSidebar({
           <div className="space-y-2">
             {quickCommunities.map((community) => {
               const isJoined = community.members.some((member) => member.userId === userId);
-              const unreadCount = countUnreadMessages(community, userId);
+              const unreadCount = isJoined ? countUnreadMessages(community, userId) : 0;
               const isCommunityActive = location.pathname === `/dashboard/communities/${community.id}`;
 
               return (
@@ -158,11 +200,13 @@ export function DashboardSidebar({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-xs font-medium">{community.title}</p>
-                      {unreadCount > 0 && (
+                      {isJoined && unreadCount > 0 && (
                         <span className="rounded-full bg-raw-gold px-1.5 py-0.5 text-[9px] font-semibold text-raw-ink">{unreadCount}</span>
                       )}
                     </div>
-                    <p className="text-[10px] text-raw-silver/35">{isJoined ? "Open chat" : "Quick join"}</p>
+                    <p className="text-[10px] text-raw-silver/35">
+                      {isJoined ? (unreadCount > 0 ? "New messages" : "Open chat") : "Quick join"}
+                    </p>
                   </div>
                   </button>
                   {!isJoined && (

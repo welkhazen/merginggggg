@@ -30,10 +30,13 @@ const Index = () => {
     setOnboardingStep,
     onboardingAnsweredPollIds,
     markOnboardingPollAnswered,
-    onboardingSelectedCommunityId,
-    setOnboardingSelectedCommunityId,
+    onboardingSelectedCommunityIds,
+    setOnboardingSelectedCommunityIds,
     onboardingCompleted,
     isOnboardingResolved,
+    dailyAnsweredCount,
+    dailyPollLimit,
+    isDailyPollLimitReached,
     completeOnboarding,
     vote,
     requestSignupOtp,
@@ -92,8 +95,20 @@ const Index = () => {
           onboardingAnsweredPollIds={onboardingAnsweredPollIds}
           onSetOnboardingStep={setOnboardingStep}
           onMarkPollAnswered={markOnboardingPollAnswered}
-          selectedCommunityId={onboardingSelectedCommunityId}
-          onSelectCommunity={setOnboardingSelectedCommunityId}
+          selectedCommunityIds={onboardingSelectedCommunityIds}
+          onToggleCommunity={(communityId) => {
+            setOnboardingSelectedCommunityIds((previous) => {
+              if (previous.includes(communityId)) {
+                return previous.filter((id) => id !== communityId);
+              }
+
+              if (previous.length >= 2) {
+                return previous;
+              }
+
+              return [...previous, communityId];
+            });
+          }}
           onCompleteOnboarding={completeOnboarding}
           onLogout={logout}
         />
@@ -107,6 +122,9 @@ const Index = () => {
         votedPolls={votedPolls}
         avatarLevel={avatarLevel}
         setAvatarLevel={setAvatarLevel}
+        dailyAnsweredCount={dailyAnsweredCount}
+        dailyPollLimit={dailyPollLimit}
+        isDailyPollLimitReached={isDailyPollLimitReached}
         vote={vote}
         onLogout={logout}
       />

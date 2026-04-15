@@ -3,7 +3,8 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { audit } from "../lib/audit";
-import { createUser, findUserByUsername, getAnonymousVotes, phoneHashExists, usernameExists } from "../lib/store";
+import { getUserRepository } from "../lib/userRepository";
+import { getAnonymousVotes } from "../lib/store";
 import { hashPassword, verifyPassword } from "../lib/password";
 import { hashPhone, normalizePhone } from "../lib/phoneHash";
 import { sendOtp, verifyOtp } from "../lib/twilio";
@@ -117,6 +118,7 @@ function incrementPhoneSendCount(phoneHash: string): void {
 }
 
 export const authRouter = Router();
+const userRepository = getUserRepository();
 
 authRouter.post("/signup/request-otp", signupLimiter, async (req, res) => {
   const parsed = signupRequestSchema.safeParse(req.body);
@@ -130,12 +132,12 @@ authRouter.post("/signup/request-otp", signupLimiter, async (req, res) => {
     return res.status(400).json({ error: "Please enter a valid phone number with country code, e.g. +447911123456." });
   }
 
-  if (usernameExists(username)) {
+  if (await userRepository.usernameExists(username)) {
     return res.status(409).json({ error: "That username already exists." });
   }
 
   const phoneHash = hashPhone(normalizedPhone);
-  if (phoneHashExists(phoneHash)) {
+  if (await userRepository.phoneHashExists(phoneHash)) {
     return res.status(409).json({ error: "That phone number is already in use." });
   }
 
@@ -179,7 +181,10 @@ authRouter.post("/signup/verify", async (req, res) => {
     return res.status(400).json({ error: "Verification code expired. Please request a new one." });
   }
 
-  if (usernameExists(pendingSignup.username) || phoneHashExists(pendingSignup.phoneHash)) {
+  if (
+    (await userRepository.usernameExists(pendingSignup.username)) ||
+    (await userRepository.phoneHashExists(pendingSignup.phoneHash))
+  ) {
     delete sessionData.pendingSignup;
     return res.status(409).json({ error: "That account can no longer be created. Start signup again." });
   }
@@ -203,7 +208,11 @@ authRouter.post("/signup/verify", async (req, res) => {
   }
 
   const previousAnonymousVotes = getAnonymousVotes(sessionData);
-  const user = createUser(pendingSignup.username, pendingSignup.passwordHash, pendingSignup.phoneHash);
+  const user = await userRepository.create({
+    username: pendingSignup.username,
+    passwordHash: pendingSignup.passwordHash,
+    phoneHash: pendingSignup.phoneHash,
+  });
 
   await regenerateSession(req.session);
   const newSession = getSessionData(req);
@@ -229,7 +238,7 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
     return res.status(429).json({ error: "Too many attempts. Try again later." });
   }
 
-  const user = findUserByUsername(username);
+  const user = await userRepository.findByUsername(username);
   if (!user) {
     registerFailure(key);
     audit("auth.login.failed", { username, ip: req.ip, reason: "missing_user" }, "warn");

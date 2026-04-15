@@ -20,8 +20,8 @@ interface OnboardingJourneyProps {
   onboardingAnsweredPollIds: Set<string>;
   onSetOnboardingStep: (step: OnboardingStep) => void;
   onMarkPollAnswered: (pollId: string) => void;
-  selectedCommunityId: string | null;
-  onSelectCommunity: (communityId: string) => void;
+  selectedCommunityIds: string[];
+  onToggleCommunity: (communityId: string) => void;
   onCompleteOnboarding: () => void;
   onLogout: () => void;
 }
@@ -152,8 +152,8 @@ export function OnboardingJourney({
   onboardingAnsweredPollIds,
   onSetOnboardingStep,
   onMarkPollAnswered,
-  selectedCommunityId,
-  onSelectCommunity,
+  selectedCommunityIds,
+  onToggleCommunity,
   onCompleteOnboarding,
   onLogout,
 }: OnboardingJourneyProps) {
@@ -166,7 +166,7 @@ export function OnboardingJourney({
 
   const canContinueFromAvatar = avatarLevel >= 1;
   const canContinueFromPolls = answeredCount >= onboardingPolls.length;
-  const canContinueFromCommunities = Boolean(selectedCommunityId);
+  const canContinueFromCommunities = selectedCommunityIds.length === 2;
 
   // Initialize poll stats with mock data
   useMemo(() => {
@@ -416,7 +416,7 @@ export function OnboardingJourney({
               {/* Single Poll Card */}
               <div className="mt-8">
                 {onboardingPolls.length > 0 && (
-                  <div className="max-w-2xl">
+                  <div className="w-full">
                     {(() => {
                       const poll = onboardingPolls[currentPollIndex];
                       const selectedOption = pollSelections[poll.id];
@@ -497,19 +497,25 @@ export function OnboardingJourney({
 
           {onboardingStep === "communities" && (
             <section>
-              <h2 className="font-display text-xl tracking-wide text-raw-text">3. Pick from 4 communities</h2>
+              <h2 className="font-display text-xl tracking-wide text-raw-text">3. Pick 2 communities to unlock first</h2>
               <p className="mt-2 text-sm text-raw-silver/45">
-                Choose a starting community. You can join more once you unlock the dashboard.
+                Choose the 2 communities you'd love first access to as a new member. You can join more after onboarding.
+              </p>
+              <p className="mt-3 inline-flex rounded-full border border-raw-border/40 px-3 py-1 text-xs text-raw-gold/75">
+                {selectedCommunityIds.length}/2 selected
               </p>
 
               <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                 {ONBOARDING_COMMUNITIES.map((community) => {
-                  const isSelected = selectedCommunityId === community.id;
+                  const isSelected = selectedCommunityIds.includes(community.id);
+                  const selectionLimitReached = selectedCommunityIds.length >= 2;
+                  const isSelectionDisabled = selectionLimitReached && !isSelected;
 
                   return (
                     <button
                       key={community.id}
-                      onClick={() => onSelectCommunity(community.id)}
+                      onClick={() => onToggleCommunity(community.id)}
+                      disabled={isSelectionDisabled}
                       className={`group overflow-hidden rounded-[26px] border text-left transition-all duration-300 ${
                         isSelected
                           ? "border-raw-gold/70 bg-raw-surface/80 shadow-[0_18px_36px_rgba(241,196,45,0.18)]"
@@ -541,10 +547,12 @@ export function OnboardingJourney({
                             className={`inline-flex rounded-full border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors ${
                               isSelected
                                 ? "border-raw-gold/80 bg-raw-gold/15 text-raw-gold"
-                                : "border-raw-border/50 text-raw-gold/85 group-hover:border-raw-gold/45"
+                                : isSelectionDisabled
+                                  ? "border-raw-border/35 text-raw-silver/35"
+                                  : "border-raw-border/50 text-raw-gold/85 group-hover:border-raw-gold/45"
                             }`}
                           >
-                            Enter Circle
+                            {isSelected ? "Selected" : "Enter Circle"}
                           </span>
                         </div>
 

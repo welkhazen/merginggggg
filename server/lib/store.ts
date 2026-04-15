@@ -38,6 +38,12 @@ function normalizeUsername(username: string): string {
   return username.toLowerCase();
 }
 
+export type UpdateUserProfileInput = {
+  username?: string;
+  displayName?: string | null;
+  bio?: string | null;
+};
+
 export function findUserById(userId: string): UserRecord | null {
   return usersById.get(userId) ?? null;
 }
@@ -54,13 +60,18 @@ export function findUserByPhoneHash(phoneHash: string): UserRecord | null {
 
 export function createUser(username: string, passwordHash: string, phoneHash: string): UserRecord {
   const id = crypto.randomUUID();
+  const now = Date.now();
   const user: UserRecord = {
     id,
     username,
+    displayName: null,
+    bio: null,
+    createdAt: now,
+    updatedAt: now,
+    passwordChangedAt: now,
     passwordHash,
     phoneHash,
     votedPollIds: new Set<string>(),
-    createdAt: Date.now(),
   };
 
   usersById.set(id, user);
@@ -75,6 +86,56 @@ export function usernameExists(username: string): boolean {
 
 export function phoneHashExists(phoneHash: string): boolean {
   return userIdByPhoneHash.has(phoneHash);
+}
+
+export function updateUserProfile(
+  userId: string,
+  updates: UpdateUserProfileInput
+): { status: "not_found" | "username_taken" | "ok"; user?: UserRecord } {
+  const user = usersById.get(userId);
+  if (!user) {
+    return { status: "not_found" };
+  }
+
+  if (typeof updates.username === "string") {
+    const requestedUsernameKey = normalizeUsername(updates.username);
+    const existingUserId = userIdByUsername.get(requestedUsernameKey);
+
+    if (existingUserId && existingUserId !== user.id) {
+      return { status: "username_taken" };
+    }
+
+    const currentUsernameKey = normalizeUsername(user.username);
+    if (requestedUsernameKey !== currentUsernameKey) {
+      userIdByUsername.delete(currentUsernameKey);
+      userIdByUsername.set(requestedUsernameKey, user.id);
+      user.username = updates.username;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "displayName")) {
+    user.displayName = updates.displayName ?? null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, "bio")) {
+    user.bio = updates.bio ?? null;
+  }
+
+  user.updatedAt = Date.now();
+  return { status: "ok", user };
+}
+
+export function updateUserPasswordHash(userId: string, passwordHash: string): boolean {
+  const user = usersById.get(userId);
+  if (!user) {
+    return false;
+  }
+
+  const now = Date.now();
+  user.passwordHash = passwordHash;
+  user.passwordChangedAt = now;
+  user.updatedAt = now;
+  return true;
 }
 
 function clonePolls(): Poll[] {
@@ -108,6 +169,11 @@ export function toPublicUser(user: UserRecord): User {
   return {
     id: user.id,
     username: user.username,
+    displayName: user.displayName,
+    bio: user.bio,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    passwordChangedAt: user.passwordChangedAt,
   };
 }
 
