@@ -38,13 +38,27 @@ function getTextPosition(index: number, total: number, radius: number): { x: num
   const angle = 360 / total;
   const center = index * angle + angle / 2 - 90;
   const rad = (center * Math.PI) / 180;
-  const textRadius = radius * 0.67;
+  const textRadius = radius * 0.62;
 
   return {
     x: radius + textRadius * Math.cos(rad),
     y: radius + textRadius * Math.sin(rad),
     rotation: center + 90,
   };
+}
+
+function getLabelLines(label: string): string[] {
+  const parts = label.trim().split(/\s+/);
+  if (parts.length <= 1) {
+    return [label];
+  }
+
+  if (parts.length === 2) {
+    return [parts[0], parts[1]];
+  }
+
+  const midpoint = Math.ceil(parts.length / 2);
+  return [parts.slice(0, midpoint).join(" "), parts.slice(midpoint).join(" ")];
 }
 
 export function WheelOfFortune({ prizes, onSpinEnd, disabled = false }: WheelOfFortuneProps) {
@@ -117,6 +131,8 @@ export function WheelOfFortune({ prizes, onSpinEnd, disabled = false }: WheelOfF
         >
           {prizes.map((prize, index) => {
             const textPosition = getTextPosition(index, total, radius);
+            const labelLines = getLabelLines(prize.shortLabel);
+            const fontSize = prize.shortLabel.length > 7 ? 12 : 14;
             return (
               <g key={prize.id}>
                 <path d={getSegmentPath(index, total, radius)} fill={prize.color} stroke="#1f1f1f" strokeWidth="1" />
@@ -124,13 +140,22 @@ export function WheelOfFortune({ prizes, onSpinEnd, disabled = false }: WheelOfF
                   x={textPosition.x}
                   y={textPosition.y}
                   fill={prize.textColor}
-                  fontSize="18"
+                  fontSize={fontSize}
                   fontWeight="700"
                   textAnchor="middle"
                   dominantBaseline="middle"
+                  letterSpacing="0.6"
                   transform={`rotate(${textPosition.rotation} ${textPosition.x} ${textPosition.y})`}
                 >
-                  {prize.shortLabel}
+                  {labelLines.map((line, lineIndex) => (
+                    <tspan
+                      key={`${prize.id}-${line}`}
+                      x={textPosition.x}
+                      dy={lineIndex === 0 ? (labelLines.length === 1 ? 0 : -6) : 12}
+                    >
+                      {line}
+                    </tspan>
+                  ))}
                 </text>
               </g>
             );
