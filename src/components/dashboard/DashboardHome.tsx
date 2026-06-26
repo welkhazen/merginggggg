@@ -94,9 +94,6 @@ export function DashboardHome({
     <div className="space-y-10">
       {/* Welcome Hero */}
       <div>
-        <p className="text-[10px] font-display tracking-[0.3em] uppercase text-raw-gold/50 mb-3">
-          Welcome back
-        </p>
         <div className="flex items-center gap-4 flex-wrap">
           <h1 className="font-display text-3xl tracking-wide text-raw-text sm:text-4xl">
             Stay
@@ -107,9 +104,6 @@ export function DashboardHome({
             className="!text-2xl sm:!text-3xl"
           />
         </div>
-        <p className="mt-3 text-sm text-raw-silver/45 max-w-md">
-          Your identity is yours. Build it through honest participation.
-        </p>
       </div>
 
       {/* Journey Progress + Streak */}
