@@ -26,11 +26,19 @@ export type DonationInterestRecord = {
 };
 
 async function jsonRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const analyticsHeaders: Record<string, string> = {};
+  if (isPostHogEnabled) {
+    analyticsHeaders["x-posthog-distinct-id"] = posthog.get_distinct_id();
+    const sessionId = posthog.get_session_id();
+    if (sessionId) analyticsHeaders["x-posthog-session-id"] = sessionId;
+  }
+
   const response = await fetch(path, {
     credentials: "include",
     ...init,
     headers: {
       "content-type": "application/json",
+      ...analyticsHeaders,
       ...(init.headers ?? {}),
     },
   });
@@ -120,3 +128,4 @@ export async function deleteDonationInterest(id: string): Promise<void> {
     body: JSON.stringify({ id }),
   });
 }
+import { isPostHogEnabled, posthog } from "@/lib/analytics";

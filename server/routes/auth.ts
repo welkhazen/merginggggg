@@ -2,6 +2,7 @@ import type { Request } from "express";
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
+import { captureServerEvent, getPostHogDistinctId } from "../lib/analytics";
 import { rpc, selectRows } from "../lib/supabaseAdmin";
 import type { AuthSessionData } from "../types";
 
@@ -81,6 +82,7 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
   sessionData.username = user.username;
   sessionData.role = user.role;
 
+  captureServerEvent(req, "admin_signed_in_server", getPostHogDistinctId(req, user.id), { role: user.role });
   return res.status(200).json({ ok: true, user: toAuthUser(user) });
 });
 
@@ -98,10 +100,17 @@ authRouter.get("/me", async (req, res) => {
 
   sessionData.username = user.username;
   sessionData.role = user.role;
+  captureServerEvent(req, "admin_session_restored_server", getPostHogDistinctId(req, user.id), { role: user.role });
   return res.status(200).json({ ok: true, user: toAuthUser(user) });
 });
 
 authRouter.post("/logout", (req, res) => {
+  const sessionData = getSessionData(req);
+  if (sessionData.userId) {
+    captureServerEvent(req, "admin_signed_out_server", getPostHogDistinctId(req, sessionData.userId), {
+      role: sessionData.role,
+    });
+  }
   req.session.destroy((err) => {
     if (err) return res.status(500).json({ error: "Logout failed." });
     res.clearCookie("raw.sid");

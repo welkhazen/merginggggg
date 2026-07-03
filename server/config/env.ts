@@ -17,6 +17,8 @@ const envSchema = z.object({
   ),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(30),
+  POSTHOG_PROJECT_API_KEY: z.preprocess(emptyToUndefined, z.string().min(20).optional()),
+  POSTHOG_HOST: z.preprocess(emptyToUndefined, z.string().url().optional()),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

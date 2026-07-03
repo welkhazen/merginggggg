@@ -19,6 +19,7 @@ import {
   type DonationInterestRecord,
   type StaffRole,
 } from "@/lib/adminApi";
+import { captureAdminEvent, captureAdminException, identifyAdmin, posthog } from "@/lib/analytics";
 
 const TIMEOUTS = [
   { label: "10 min", minutes: 10 },
@@ -91,9 +92,14 @@ function LoginView({ onLogin }: { onLogin: (user: AdminUser) => void }) {
     event.preventDefault();
     setLoading(true);
     try {
-      onLogin(await login(username.trim(), password));
+      const user = await login(username.trim(), password);
+      identifyAdmin(user);
+      captureAdminEvent("admin_signed_in", { role: user.role });
+      onLogin(user);
       toast({ title: "Signed in" });
-    } catch {
+    } catch (error) {
+      captureAdminException(error, { action: "admin_sign_in" });
+      captureAdminEvent("admin_sign_in_failed");
       toast({ title: "Could not sign in", description: "Use an admin or moderator account." });
     } finally {
       setLoading(false);
@@ -129,7 +135,16 @@ export default function Admin() {
   const [booting, setBooting] = useState(true);
 
   useEffect(() => {
-    getSession().then(setUser).finally(() => setBooting(false));
+    getSession()
+      .then((sessionUser) => {
+        if (sessionUser) {
+          identifyAdmin(sessionUser);
+          captureAdminEvent("admin_session_restored", { role: sessionUser.role });
+        }
+        setUser(sessionUser);
+      })
+      .catch((error) => captureAdminException(error, { action: "admin_session_restore" }))
+      .finally(() => setBooting(false));
   }, []);
 
   if (booting) {
@@ -153,6 +168,8 @@ export default function Admin() {
         <AdminButton
           tone="outline"
           onClick={() => {
+            captureAdminEvent("admin_signed_out", { role: user.role });
+            posthog.reset();
             void logout().finally(() => setUser(null));
           }}
         >
@@ -186,8 +203,10 @@ function ModerateUser() {
     setPending(`${action}-${minutes ?? ""}`);
     try {
       await moderateUser(target, action, minutes);
+      captureAdminEvent("admin_user_moderated", { action, minutes, target_username: target });
       toast({ title: "Action applied", description: `@${target} updated.` });
     } catch (error) {
+      captureAdminException(error, { action: "admin_user_moderation", moderation_action: action });
       toast({ title: "Action failed", description: error instanceof Error ? error.message : "Please try again." });
     } finally {
       setPending(null);
@@ -229,10 +248,12 @@ function CreateStaff() {
     setCreating(true);
     try {
       await createStaffAccount(username.trim(), password, role);
+      captureAdminEvent("admin_staff_account_created", { role });
       setUsername("");
       setPassword("");
       toast({ title: "Staff account created" });
     } catch (error) {
+      captureAdminException(error, { action: "admin_staff_account_create", role });
       toast({ title: "Could not create account", description: error instanceof Error ? error.message : "Please try again." });
     } finally {
       setCreating(false);
@@ -266,9 +287,11 @@ function GrantInvites({ currentUsername }: { currentUsername: string }) {
     setLoading(true);
     try {
       const codes = await grantInviteCodes(target, amount);
+      captureAdminEvent("admin_invite_codes_granted", { amount: codes.length, target_self: target === currentUsername });
       toast({ title: "Invite codes granted", description: `${codes.length} code(s) created for @${target}.` });
       if (target !== currentUsername) setUsername("");
     } catch (error) {
+      captureAdminException(error, { action: "admin_invite_codes_grant", amount });
       toast({ title: "Could not grant codes", description: error instanceof Error ? error.message : "Please try again." });
     } finally {
       setLoading(false);
@@ -310,6 +333,7 @@ function BlockedWords() {
     try {
       setWords(await fetchBlockedWords());
     } catch {
+      captureAdminEvent("admin_blocked_words_load_failed");
       toast({ title: "Could not load blocked words" });
     } finally {
       setLoading(false);
@@ -323,16 +347,19 @@ function BlockedWords() {
   async function save() {
     try {
       const saved = await addBlockedWord(term.trim());
+      captureAdminEvent("admin_blocked_word_added");
       setWords((current) => [...current.filter((word) => word.id !== saved.id), saved]);
       setTerm("");
       toast({ title: "Blocked word saved" });
     } catch {
+      captureAdminEvent("admin_blocked_word_add_failed");
       toast({ title: "Could not save word" });
     }
   }
 
   async function remove(id: string) {
     await removeBlockedWord(id);
+    captureAdminEvent("admin_blocked_word_removed");
     setWords((current) => current.filter((word) => word.id !== id));
   }
 
@@ -375,6 +402,8 @@ function DonationRequests() {
     setLoading(true);
     try {
       setRequests(await fetchDonationInterests());
+    } catch (error) {
+      captureAdminException(error, { action: "admin_donation_requests_load" });
     } finally {
       setLoading(false);
     }
@@ -386,11 +415,13 @@ function DonationRequests() {
 
   async function markReviewed(id: string) {
     await updateDonationInterestStatus(id, "reviewed");
+    captureAdminEvent("admin_donation_interest_reviewed");
     setRequests((current) => current.map((request) => request.id === id ? { ...request, status: "reviewed" } : request));
   }
 
   async function remove(id: string) {
     await deleteDonationInterest(id);
+    captureAdminEvent("admin_donation_interest_deleted");
     setRequests((current) => current.filter((request) => request.id !== id));
   }
 
