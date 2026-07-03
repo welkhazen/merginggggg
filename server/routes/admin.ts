@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
+import { captureServerEvent, getPostHogDistinctId } from "../lib/analytics";
 import { deleteRows, insertRow, rpc, selectRows, updateRows } from "../lib/supabaseAdmin";
 import type { AuthSessionData } from "../types";
 
@@ -118,6 +119,10 @@ function makeInviteCode() {
   return `RAW-1-${randomBytes(5).toString("hex").toUpperCase()}`;
 }
 
+function analyticsId(req: Request) {
+  return getPostHogDistinctId(req, session(req).userId ?? "unknown-admin");
+}
+
 export const adminRouter = Router();
 
 adminRouter.use(requireStaff);
@@ -148,6 +153,11 @@ adminRouter.post("/moderate-user", async (req, res) => {
           : { status: "active", moderation_status: "active", banned_until: null, last_moderated_at: now.toISOString() };
 
   await updateRows("users", { id: `eq.${target.id}` }, updates);
+  captureServerEvent(req, "admin_user_moderated_server", analyticsId(req), {
+    action: parsed.data.action,
+    minutes: parsed.data.minutes,
+    target_role: target.role,
+  });
   return res.status(200).json({ ok: true });
 });
 
@@ -161,6 +171,7 @@ adminRouter.post("/create-staff-account", requireAdmin, async (req, res) => {
       p_password: parsed.data.password,
     });
     await updateRows("users", { id: `eq.${id}` }, { role: parsed.data.role, status: "active" });
+    captureServerEvent(req, "admin_staff_account_created_server", analyticsId(req), { role: parsed.data.role });
     return res.status(200).json({ ok: true });
   } catch (error) {
     const message = error instanceof Error && error.message.includes("username") ? "username_taken" : "create_failed";
@@ -181,6 +192,7 @@ adminRouter.post("/grant-invite-codes", requireAdmin, async (req, res) => {
     await insertRow("founding_invites", { inviter_id: target.id, code });
     codes.push(code);
   }
+  captureServerEvent(req, "admin_invite_codes_granted_server", analyticsId(req), { amount: codes.length });
   return res.status(200).json({ codes });
 });
 
@@ -200,6 +212,7 @@ adminRouter.post("/blocked-words", requireAdmin, async (req, res) => {
     term: parsed.data.term,
     created_by: session(req).userId,
   });
+  captureServerEvent(req, "admin_blocked_word_added_server", analyticsId(req));
   return res.status(200).json({ blockedWord: mapBlockedWord(row) });
 });
 
@@ -208,6 +221,7 @@ adminRouter.delete("/blocked-words", requireAdmin, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
 
   await deleteRows("blocked_words", { id: `eq.${parsed.data.id}` });
+  captureServerEvent(req, "admin_blocked_word_removed_server", analyticsId(req));
   return res.status(200).json({ ok: true });
 });
 
@@ -224,6 +238,7 @@ adminRouter.patch("/donation-interests", requireAdmin, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
 
   await updateRows("donation_interests", { id: `eq.${parsed.data.id}` }, { status: parsed.data.status });
+  captureServerEvent(req, "admin_donation_interest_status_updated_server", analyticsId(req), { status: parsed.data.status });
   return res.status(200).json({ ok: true });
 });
 
@@ -232,5 +247,6 @@ adminRouter.delete("/donation-interests", requireAdmin, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
 
   await deleteRows("donation_interests", { id: `eq.${parsed.data.id}` });
+  captureServerEvent(req, "admin_donation_interest_deleted_server", analyticsId(req));
   return res.status(200).json({ ok: true });
 });
