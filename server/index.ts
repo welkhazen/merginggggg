@@ -3,12 +3,12 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
+import path from "node:path";
 import rateLimit from "express-rate-limit";
 import session from "express-session";
 import { env } from "./config/env";
+import { adminRouter } from "./routes/admin";
 import { authRouter } from "./routes/auth";
-import { pollsRouter } from "./routes/polls";
-import { usersRouter } from "./routes/users";
 
 const app = express();
 const isProduction = env.NODE_ENV === "production";
@@ -83,8 +83,14 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
-app.use("/api/users", usersRouter);
-app.use("/api", pollsRouter);
+app.use("/api/admin", adminRouter);
+
+const clientDist = path.resolve(process.cwd(), "dist");
+app.use(express.static(clientDist));
+app.use((req, res, next) => {
+  if (req.method !== "GET" || req.path.startsWith("/api")) return next();
+  return res.sendFile(path.join(clientDist, "index.html"));
+});
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

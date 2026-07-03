@@ -39,6 +39,8 @@ export interface Poll {
 
 export interface AuthSessionData {
   userId?: string;
+  username?: string;
+  role?: "admin" | "moderator";
   anonymousVotes?: string[];
   pendingSignup?: PendingSignupData;
 }
