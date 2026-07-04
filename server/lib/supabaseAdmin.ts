@@ -56,6 +56,19 @@ export async function selectRows<T>(table: string, params: Record<string, QueryV
   );
 }
 
+export async function countRows(table: string, params: Record<string, QueryValue> = {}): Promise<number> {
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}${queryString({ ...params, select: "*", limit: 1 })}`, {
+    method: "HEAD",
+    headers: headers({ prefer: "count=exact" }),
+  });
+  if (!response.ok) {
+    throw new SupabaseAdminError("supabase_count_failed", response.status);
+  }
+  const contentRange = response.headers.get("content-range");
+  const total = contentRange?.split("/")[1];
+  return total && total !== "*" ? Number.parseInt(total, 10) : 0;
+}
+
 export async function insertRow<T>(table: string, payload: Record<string, unknown>): Promise<T> {
   const rows = await parseResponse<T[]>(
     await fetch(`${env.SUPABASE_URL}/rest/v1/${table}`, {
