@@ -1,16 +1,19 @@
-import type { Request } from "express";
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { captureServerEvent, getPostHogDistinctId } from "../lib/analytics";
+import type { StaffTier } from "../lib/roles";
+import { resolveTier } from "../lib/roles";
+import { clearSessionCookie, setSessionCookie } from "../lib/sessionToken";
 import { rpc, selectRows } from "../lib/supabaseAdmin";
-import type { AuthSessionData } from "../types";
+import { getAdminSession } from "../middleware/adminAuth";
 
 type DbUser = {
   id: string;
   username: string;
-  role: "admin" | "moderator" | "member" | "user";
+  role: string;
   status: string;
+  staff_tier: string | null;
 };
 
 const loginSchema = z.object({
@@ -26,28 +29,19 @@ const loginLimiter = rateLimit({
   message: { error: "Too many attempts. Try again later." },
 });
 
-function getSessionData(req: Request): AuthSessionData {
-  return req.session as unknown as AuthSessionData;
-}
-
-async function regenerateSession(session: { regenerate: (callback: (err: unknown) => void) => void }): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    session.regenerate((err: unknown) => (err ? reject(err) : resolve()));
-  });
-}
-
-function toAuthUser(user: DbUser) {
+function toAuthUser(user: DbUser, tier: StaffTier) {
   return {
     id: user.id,
     username: user.username,
     role: user.role,
+    tier,
     status: user.status,
   };
 }
 
 async function findUserById(id: string) {
   const rows = await selectRows<DbUser>("users", {
-    select: "id,username,role,status",
+    select: "id,username,role,status,staff_tier",
     id: `eq.${id}`,
     limit: 1,
   });
@@ -72,48 +66,44 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
   }
 
   const user = await findUserById(userId);
-  if (!user || user.status === "banned" || (user.role !== "admin" && user.role !== "moderator")) {
-    return res.status(403).json({ error: "Admin access only." });
+  const tier = user ? resolveTier(user) : null;
+  if (!user || user.status === "banned" || !tier) {
+    return res.status(403).json({ error: "Staff access only." });
   }
 
-  await regenerateSession(req.session);
-  const sessionData = getSessionData(req);
-  sessionData.userId = user.id;
-  sessionData.username = user.username;
-  sessionData.role = user.role;
+  setSessionCookie(res, { userId: user.id, username: user.username, role: user.role, tier });
 
-  captureServerEvent(req, "admin_signed_in_server", getPostHogDistinctId(req, user.id), { role: user.role });
-  return res.status(200).json({ ok: true, user: toAuthUser(user) });
+  captureServerEvent(req, "admin_signed_in_server", getPostHogDistinctId(req, user.id), { role: user.role, tier });
+  return res.status(200).json({ ok: true, user: toAuthUser(user, tier) });
 });
 
 authRouter.get("/me", async (req, res) => {
-  const sessionData = getSessionData(req);
-  if (!sessionData.userId) {
+  const session = getAdminSession(req);
+  if (!session) {
     return res.status(401).json({ error: "Not authenticated." });
   }
 
-  const user = await findUserById(sessionData.userId);
-  if (!user || user.status === "banned" || (user.role !== "admin" && user.role !== "moderator")) {
-    sessionData.userId = undefined;
+  // Re-fetch so bans and tier changes take effect on the next request.
+  const user = await findUserById(session.userId);
+  const tier = user ? resolveTier(user) : null;
+  if (!user || user.status === "banned" || !tier) {
+    clearSessionCookie(res);
     return res.status(401).json({ error: "Not authenticated." });
   }
 
-  sessionData.username = user.username;
-  sessionData.role = user.role;
-  captureServerEvent(req, "admin_session_restored_server", getPostHogDistinctId(req, user.id), { role: user.role });
-  return res.status(200).json({ ok: true, user: toAuthUser(user) });
+  setSessionCookie(res, { userId: user.id, username: user.username, role: user.role, tier });
+  captureServerEvent(req, "admin_session_restored_server", getPostHogDistinctId(req, user.id), { role: user.role, tier });
+  return res.status(200).json({ ok: true, user: toAuthUser(user, tier) });
 });
 
 authRouter.post("/logout", (req, res) => {
-  const sessionData = getSessionData(req);
-  if (sessionData.userId) {
-    captureServerEvent(req, "admin_signed_out_server", getPostHogDistinctId(req, sessionData.userId), {
-      role: sessionData.role,
+  const session = getAdminSession(req);
+  if (session) {
+    captureServerEvent(req, "admin_signed_out_server", getPostHogDistinctId(req, session.userId), {
+      role: session.role,
+      tier: session.tier,
     });
   }
-  req.session.destroy((err) => {
-    if (err) return res.status(500).json({ error: "Logout failed." });
-    res.clearCookie("raw.sid");
-    return res.status(200).json({ ok: true });
-  });
+  clearSessionCookie(res);
+  return res.status(200).json({ ok: true });
 });
