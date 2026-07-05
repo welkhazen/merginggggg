@@ -59,7 +59,9 @@ export async function selectRows<T>(table: string, params: Record<string, QueryV
 export async function countRows(table: string, params: Record<string, QueryValue> = {}): Promise<number> {
   const response = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}${queryString({ ...params, select: "*", limit: 1 })}`, {
     method: "HEAD",
-    headers: headers({ prefer: "count=exact" }),
+    // Exact below PostgREST's max-rows threshold, planner estimate beyond it —
+    // keeps the stats endpoint cheap as tables grow.
+    headers: headers({ prefer: "count=estimated" }),
   });
   if (!response.ok) {
     throw new SupabaseAdminError("supabase_count_failed", response.status);

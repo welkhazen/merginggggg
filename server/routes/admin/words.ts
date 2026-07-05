@@ -87,9 +87,20 @@ wordsRouter.delete("/blocked-words", async (req, res) => {
   const parsed = idSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
 
+  // Fetch the term first so the audit entry says what was removed.
+  const existing = await selectRows<{ term: string }>("blocked_words", {
+    select: "term",
+    id: `eq.${parsed.data.id}`,
+    limit: 1,
+  });
   await deleteRows("blocked_words", { id: `eq.${parsed.data.id}` });
   const session = adminSession(res);
-  await writeAudit(session, { action: "blocked_word_removed", targetType: "blocked_word", targetId: parsed.data.id });
+  await writeAudit(session, {
+    action: "blocked_word_removed",
+    targetType: "blocked_word",
+    targetId: parsed.data.id,
+    targetLabel: existing[0]?.term,
+  });
   captureServerEvent(req, "admin_blocked_word_removed_server", getPostHogDistinctId(req, session.userId));
   return res.status(200).json({ ok: true });
 });
@@ -128,7 +139,17 @@ wordsRouter.delete("/banned-words", async (req, res) => {
   const parsed = idSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
 
+  const existing = await selectRows<{ word: string }>("banned_words", {
+    select: "word",
+    id: `eq.${parsed.data.id}`,
+    limit: 1,
+  });
   await deleteRows("banned_words", { id: `eq.${parsed.data.id}` });
-  await writeAudit(adminSession(res), { action: "banned_word_removed", targetType: "banned_word", targetId: parsed.data.id });
+  await writeAudit(adminSession(res), {
+    action: "banned_word_removed",
+    targetType: "banned_word",
+    targetId: parsed.data.id,
+    targetLabel: existing[0]?.word,
+  });
   return res.status(200).json({ ok: true });
 });
