@@ -82,8 +82,8 @@ function CommunityInspector({ community }: { community: CommunitySummary }) {
   const members = useAsyncData(() => fetchCommunityMembers(community.id), [community.id]);
 
   async function removeMessage(message: CommunityMessage) {
-    const reason = window.prompt(`Delete this message from @${message.senderName ?? "unknown"}?\nOptional reason:`) ?? undefined;
-    if (reason === undefined && !window.confirm("Delete without a reason?")) return;
+    const reason = window.prompt(`Delete this message from @${message.senderName ?? "unknown"}?\nOptional reason:`);
+    if (reason === null) return; // cancelled
     try {
       await deleteCommunityMessage(message.id, reason || undefined);
       captureAdminEvent("admin_message_deleted", { community_id: community.id });

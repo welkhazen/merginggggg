@@ -131,7 +131,7 @@ function CreateStaffPanel({ currentUser, onCreated }: { currentUser: AdminUser; 
     <Panel title="Create staff account" hint="Create a new login with a staff tier.">
       <div className="grid gap-2 sm:grid-cols-[1fr_1fr_170px_auto]">
         <Field value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" />
-        <Field value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" type="password" />
+        <Field value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password (min 12 chars)" type="password" />
         <SelectField value={tier} onChange={(event) => setTier(event.target.value as StaffTier)}>
           {creatableTiers.map((candidate) => (
             <option key={candidate} value={candidate}>
@@ -139,7 +139,7 @@ function CreateStaffPanel({ currentUser, onCreated }: { currentUser: AdminUser; 
             </option>
           ))}
         </SelectField>
-        <AdminButton disabled={creating || !username.trim() || password.length < 6} onClick={() => void submit()}>
+        <AdminButton disabled={creating || !username.trim() || password.length < 12} onClick={() => void submit()}>
           <UserPlus className="h-4 w-4" /> Create
         </AdminButton>
       </div>

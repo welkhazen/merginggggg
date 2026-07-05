@@ -75,9 +75,10 @@ wordsRouter.post("/blocked-words", async (req, res) => {
   const session = adminSession(res);
   const row = await insertRow<BlockedWordRow>("blocked_words", {
     term: parsed.data.term,
+    normalized_term: parsed.data.term.toLowerCase(),
     created_by: session.userId,
   });
-  writeAudit(session, { action: "blocked_word_added", targetType: "blocked_word", targetId: row.id, targetLabel: row.term });
+  await writeAudit(session, { action: "blocked_word_added", targetType: "blocked_word", targetId: row.id, targetLabel: row.term });
   captureServerEvent(req, "admin_blocked_word_added_server", getPostHogDistinctId(req, session.userId));
   return res.status(200).json({ blockedWord: mapBlockedWord(row) });
 });
@@ -88,7 +89,7 @@ wordsRouter.delete("/blocked-words", async (req, res) => {
 
   await deleteRows("blocked_words", { id: `eq.${parsed.data.id}` });
   const session = adminSession(res);
-  writeAudit(session, { action: "blocked_word_removed", targetType: "blocked_word", targetId: parsed.data.id });
+  await writeAudit(session, { action: "blocked_word_removed", targetType: "blocked_word", targetId: parsed.data.id });
   captureServerEvent(req, "admin_blocked_word_removed_server", getPostHogDistinctId(req, session.userId));
   return res.status(200).json({ ok: true });
 });
@@ -113,7 +114,7 @@ wordsRouter.post("/banned-words", async (req, res) => {
     category: parsed.data.category ?? null,
     added_by: session.username,
   });
-  writeAudit(session, {
+  await writeAudit(session, {
     action: "banned_word_added",
     targetType: "banned_word",
     targetId: row.id,
@@ -128,6 +129,6 @@ wordsRouter.delete("/banned-words", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
 
   await deleteRows("banned_words", { id: `eq.${parsed.data.id}` });
-  writeAudit(adminSession(res), { action: "banned_word_removed", targetType: "banned_word", targetId: parsed.data.id });
+  await writeAudit(adminSession(res), { action: "banned_word_removed", targetType: "banned_word", targetId: parsed.data.id });
   return res.status(200).json({ ok: true });
 });

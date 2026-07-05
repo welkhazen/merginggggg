@@ -74,7 +74,7 @@ requestsRouter.patch("/community-requests/:id", async (req, res) => {
   );
   if (rows.length === 0) return res.status(404).json({ error: "request_not_found" });
 
-  writeAudit(session, {
+  await writeAudit(session, {
     action: "community_request_reviewed",
     targetType: "community_request",
     targetId: req.params.id,

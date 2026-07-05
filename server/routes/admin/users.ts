@@ -64,12 +64,17 @@ function mapUser(row: DbUser) {
 }
 
 async function findUserByUsername(username: string) {
+  // ilike patterns treat % and _ as wildcards, so a crafted "username" could
+  // target the wrong account. Strip pattern characters for the query, then
+  // require an exact case-insensitive match on the result.
+  const safe = username.replace(/[%_*,()\\]/g, "");
+  if (!safe) return null;
   const rows = await selectRows<DbUser>("users", {
     select: USER_SELECT,
-    username: `ilike.${username}`,
-    limit: 1,
+    username: `ilike.${safe}`,
+    limit: 5,
   });
-  return rows[0] ?? null;
+  return rows.find((row) => row.username.toLowerCase() === username.toLowerCase()) ?? null;
 }
 
 export const usersRouter = Router();
@@ -84,8 +89,10 @@ usersRouter.get("/users", requireTier("admin"), async (req, res) => {
     limit: parsed.data.limit,
     offset: parsed.data.offset,
   };
-  if (parsed.data.q) params.username = `ilike.*${parsed.data.q.replace(/[%*,()]/g, "")}*`;
-  if (parsed.data.status !== "all") params.status = `eq.${parsed.data.status}`;
+  if (parsed.data.q) params.username = `ilike.*${parsed.data.q.replace(/[%_*,()\\]/g, "")}*`;
+  // Warnings set moderation_status while status stays "active".
+  if (parsed.data.status === "warned") params.moderation_status = "eq.warned";
+  else if (parsed.data.status !== "all") params.status = `eq.${parsed.data.status}`;
 
   const rows = await selectRows<DbUser>("users", params);
   return res.status(200).json({ users: rows.map(mapUser) });
@@ -176,7 +183,9 @@ usersRouter.post("/moderate-user", async (req, res) => {
 
   await updateRows("users", { id: `eq.${target.id}` }, updates);
 
-  void insertRow("moderation_actions", {
+  // Awaited so serverless invocations can't drop the history write; a failure
+  // here still must not undo the applied moderation.
+  await insertRow("moderation_actions", {
     target_user_id: target.id,
     actor_id: session.userId,
     action: parsed.data.action,
@@ -187,7 +196,7 @@ usersRouter.post("/moderate-user", async (req, res) => {
         : null,
   }).catch((error) => console.error("[moderation] failed to record action", error));
 
-  writeAudit(session, {
+  await writeAudit(session, {
     action: `user_${parsed.data.action}`,
     targetType: "user",
     targetId: target.id,
@@ -247,7 +256,7 @@ usersRouter.patch("/appeals/:id", requireTier("admin"), async (req, res) => {
   );
   if (rows.length === 0) return res.status(404).json({ error: "appeal_not_found" });
 
-  writeAudit(session, {
+  await writeAudit(session, {
     action: "appeal_reviewed",
     targetType: "appeal",
     targetId: String(req.params.id),

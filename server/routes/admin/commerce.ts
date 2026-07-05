@@ -64,7 +64,7 @@ commerceRouter.patch("/donation-interests", async (req, res) => {
 
   await updateRows("donation_interests", { id: `eq.${parsed.data.id}` }, { status: parsed.data.status });
   const session = adminSession(res);
-  writeAudit(session, {
+  await writeAudit(session, {
     action: "donation_interest_updated",
     targetType: "donation_interest",
     targetId: parsed.data.id,
@@ -82,7 +82,7 @@ commerceRouter.delete("/donation-interests", async (req, res) => {
 
   await deleteRows("donation_interests", { id: `eq.${parsed.data.id}` });
   const session = adminSession(res);
-  writeAudit(session, {
+  await writeAudit(session, {
     action: "donation_interest_deleted",
     targetType: "donation_interest",
     targetId: parsed.data.id,
@@ -126,7 +126,7 @@ commerceRouter.patch("/token-requests/:id", async (req, res) => {
   );
   if (rows.length === 0) return res.status(404).json({ error: "token_request_not_found" });
 
-  writeAudit(adminSession(res), {
+  await writeAudit(adminSession(res), {
     action: "token_request_updated",
     targetType: "token_request",
     targetId: req.params.id,

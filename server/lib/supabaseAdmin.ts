@@ -80,6 +80,16 @@ export async function insertRow<T>(table: string, payload: Record<string, unknow
   return rows[0];
 }
 
+export async function insertRows<T>(table: string, payload: Array<Record<string, unknown>>): Promise<T[]> {
+  return parseResponse<T[]>(
+    await fetch(`${env.SUPABASE_URL}/rest/v1/${table}`, {
+      method: "POST",
+      headers: headers({ prefer: "return=representation" }),
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
 export async function updateRows<T>(
   table: string,
   params: Record<string, QueryValue>,

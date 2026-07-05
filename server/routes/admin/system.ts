@@ -94,7 +94,7 @@ systemRouter.patch("/system/errors/:id", async (req, res) => {
   );
   if (rows.length === 0) return res.status(404).json({ error: "error_event_not_found" });
 
-  writeAudit(session, {
+  await writeAudit(session, {
     action: parsed.data.resolved ? "error_event_resolved" : "error_event_reopened",
     targetType: "error_event",
     targetId: req.params.id,

@@ -14,6 +14,24 @@ const reportSchema = z.object({
   context: z.record(z.string(), z.unknown()).optional(),
 });
 
+// The endpoint is unauthenticated and the report is stored + emailed, so the
+// caller-supplied context is reduced to a few short primitive values and
+// anything that looks like a credential is dropped.
+const SENSITIVE_KEY = /(pass|token|secret|key|auth|cookie|session|credential|email|phone)/i;
+const MAX_CONTEXT_KEYS = 20;
+const MAX_CONTEXT_VALUE_LENGTH = 300;
+
+function sanitizeContext(context: Record<string, unknown> | undefined): Record<string, unknown> {
+  const clean: Record<string, unknown> = {};
+  if (!context) return clean;
+  for (const [key, value] of Object.entries(context).slice(0, MAX_CONTEXT_KEYS)) {
+    if (SENSITIVE_KEY.test(key)) continue;
+    if (typeof value === "string") clean[key.slice(0, 60)] = value.slice(0, MAX_CONTEXT_VALUE_LENGTH);
+    else if (typeof value === "number" || typeof value === "boolean" || value === null) clean[key.slice(0, 60)] = value;
+  }
+  return clean;
+}
+
 const reportLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 10,
@@ -32,9 +50,9 @@ errorsRouter.post("/report", reportLimiter, async (req, res) => {
 
   const session = getAdminSession(req);
   const context = {
-    ...(parsed.data.context ?? {}),
+    ...sanitizeContext(parsed.data.context),
     reportedBy: session?.username ?? "anonymous",
-    userAgent: req.header("user-agent") ?? null,
+    userAgent: req.header("user-agent")?.slice(0, 200) ?? null,
   };
 
   await insertRow("error_events", {

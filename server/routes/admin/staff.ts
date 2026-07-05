@@ -4,7 +4,7 @@ import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics";
 import { writeAudit } from "../../lib/audit";
 import type { StaffTier } from "../../lib/roles";
 import { resolveTier, roleForTier, STAFF_TIERS, TIER_RANK } from "../../lib/roles";
-import { rpc, selectRows, updateRows } from "../../lib/supabaseAdmin";
+import { deleteRows, rpc, selectRows, updateRows } from "../../lib/supabaseAdmin";
 import { adminSession } from "../../middleware/adminAuth";
 
 type DbUser = {
@@ -19,7 +19,7 @@ type DbUser = {
 
 const createStaffSchema = z.object({
   username: z.string().trim().min(3).max(24),
-  password: z.string().min(6).max(128),
+  password: z.string().min(12).max(128),
   tier: z.enum(STAFF_TIERS),
 });
 
@@ -66,17 +66,19 @@ staffRouter.post("/create-staff-account", async (req, res) => {
     return res.status(403).json({ error: "insufficient_tier" });
   }
 
+  let createdId: string | null = null;
   try {
     const id = await rpc<string>("create_user_with_password", {
       p_username: parsed.data.username,
       p_password: parsed.data.password,
     });
+    createdId = id;
     await updateRows(
       "users",
       { id: `eq.${id}` },
       { role: roleForTier(parsed.data.tier), staff_tier: parsed.data.tier, status: "active" },
     );
-    writeAudit(session, {
+    await writeAudit(session, {
       action: "staff_account_created",
       targetType: "user",
       targetId: id,
@@ -88,6 +90,12 @@ staffRouter.post("/create-staff-account", async (req, res) => {
     });
     return res.status(200).json({ ok: true });
   } catch (error) {
+    // Roll back a half-created account so retrying doesn't hit username_taken.
+    if (createdId) {
+      await deleteRows("users", { id: `eq.${createdId}` }).catch((cleanupError) =>
+        console.error("[staff] failed to roll back partial account", cleanupError),
+      );
+    }
     const message = error instanceof Error && error.message.includes("username") ? "username_taken" : "create_failed";
     return res.status(message === "username_taken" ? 409 : 500).json({ error: message });
   }
@@ -129,7 +137,7 @@ staffRouter.patch("/staff/tier", async (req, res) => {
       : { staff_tier: null, role: "user" },
   );
 
-  writeAudit(session, {
+  await writeAudit(session, {
     action: parsed.data.tier ? "staff_tier_changed" : "staff_tier_revoked",
     targetType: "user",
     targetId: target.id,

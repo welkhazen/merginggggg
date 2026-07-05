@@ -87,7 +87,7 @@ reportsRouter.patch("/reports/:id", async (req, res) => {
   );
   if (rows.length === 0) return res.status(404).json({ error: "report_not_found" });
 
-  writeAudit(session, {
+  await writeAudit(session, {
     action: "report_resolved",
     targetType: "chat_report",
     targetId: req.params.id,

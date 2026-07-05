@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics";
 import { writeAudit } from "../../lib/audit";
-import { insertRow, selectRows } from "../../lib/supabaseAdmin";
+import { insertRows, selectRows } from "../../lib/supabaseAdmin";
 import { adminSession } from "../../middleware/adminAuth";
 
 const inviteSchema = z.object({
@@ -21,23 +21,26 @@ invitesRouter.post("/grant-invite-codes", async (req, res) => {
   const parsed = inviteSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
 
-  const users = await selectRows<{ id: string; username: string }>("users", {
-    select: "id,username",
-    username: `ilike.${parsed.data.username}`,
-    limit: 1,
-  });
-  const target = users[0];
+  const safe = parsed.data.username.replace(/[%_*,()\\]/g, "");
+  const users = safe
+    ? await selectRows<{ id: string; username: string }>("users", {
+        select: "id,username",
+        username: `ilike.${safe}`,
+        limit: 5,
+      })
+    : [];
+  const target = users.find((row) => row.username.toLowerCase() === parsed.data.username.toLowerCase());
   if (!target) return res.status(404).json({ error: "user_not_found" });
 
-  const codes: string[] = [];
-  for (let index = 0; index < parsed.data.count; index += 1) {
-    const code = makeInviteCode();
-    await insertRow("founding_invites", { inviter_id: target.id, code });
-    codes.push(code);
-  }
+  // One bulk insert so the whole grant succeeds or fails together.
+  const codes = Array.from({ length: parsed.data.count }, () => makeInviteCode());
+  await insertRows(
+    "founding_invites",
+    codes.map((code) => ({ inviter_id: target.id, code })),
+  );
 
   const session = adminSession(res);
-  writeAudit(session, {
+  await writeAudit(session, {
     action: "invite_codes_granted",
     targetType: "user",
     targetId: target.id,

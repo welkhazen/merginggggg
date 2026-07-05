@@ -77,7 +77,7 @@ flagsRouter.patch("/flags/:id", async (req, res) => {
   );
   if (rows.length === 0) return res.status(404).json({ error: "flag_not_found" });
 
-  writeAudit(session, {
+  await writeAudit(session, {
     action: "flag_reviewed",
     targetType: "moderation_flag",
     targetId: req.params.id,

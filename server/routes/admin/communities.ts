@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { writeAudit } from "../../lib/audit";
-import { insertRow, selectRows, updateRows } from "../../lib/supabaseAdmin";
+import { insertRow, rpc, selectRows, updateRows } from "../../lib/supabaseAdmin";
 import { adminSession } from "../../middleware/adminAuth";
 
 type CommunityRow = {
@@ -47,17 +47,18 @@ const messagesQuerySchema = z.object({
 export const communitiesRouter = Router();
 
 communitiesRouter.get("/communities", async (_req, res) => {
-  const [communities, memberships] = await Promise.all([
+  const [communities, counts] = await Promise.all([
     selectRows<CommunityRow>("communities", {
       select: "id,abbr,title,topic,status,locked,created_at",
       order: "title.asc",
     }),
-    selectRows<{ community_id: string }>("community_members", { select: "community_id" }),
+    // Aggregated in the database; a plain select would be capped at 1000 rows.
+    rpc<Array<{ community_id: string; member_count: number }>>("admin_community_member_counts", {}),
   ]);
 
   const memberCounts = new Map<string, number>();
-  for (const membership of memberships) {
-    memberCounts.set(membership.community_id, (memberCounts.get(membership.community_id) ?? 0) + 1);
+  for (const row of counts ?? []) {
+    memberCounts.set(row.community_id, Number(row.member_count));
   }
 
   return res.status(200).json({
@@ -87,7 +88,7 @@ communitiesRouter.patch("/communities/:id", async (req, res) => {
   const rows = await updateRows<CommunityRow>("communities", { id: `eq.${req.params.id}` }, updates);
   if (rows.length === 0) return res.status(404).json({ error: "community_not_found" });
 
-  writeAudit(adminSession(res), {
+  await writeAudit(adminSession(res), {
     action: "community_updated",
     targetType: "community",
     targetId: req.params.id,
@@ -173,7 +174,7 @@ communitiesRouter.delete("/messages/:id", async (req, res) => {
 
   const message = rows[0];
   if (message.sender_id) {
-    void insertRow("moderation_actions", {
+    await insertRow("moderation_actions", {
       target_user_id: message.sender_id,
       actor_id: session.userId,
       action: "delete_message",
@@ -183,7 +184,7 @@ communitiesRouter.delete("/messages/:id", async (req, res) => {
     }).catch((error) => console.error("[moderation] failed to record delete_message", error));
   }
 
-  writeAudit(session, {
+  await writeAudit(session, {
     action: "message_deleted",
     targetType: "message",
     targetId: message.id,
