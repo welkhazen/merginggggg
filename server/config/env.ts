@@ -85,4 +85,53 @@ if (
   console.error("[startup] SESSION_SECRET must be set to a unique value in production.");
 }
 
-export const env = parsedEnv.success ? parsedEnv.data : fallbackEnv;
+// Placeholders keep importing modules loadable when config is broken; the
+// /api gate in server/index.ts rejects requests before these are ever used.
+// This MUST never throw: a throw at import time crashes the whole serverless
+// function into an opaque FUNCTION_INVOCATION_FAILED, which is exactly the
+// failure mode this module exists to prevent. So we try the real env first,
+// then fall back to a minimal input that cannot fail validation.
+type Env = z.infer<typeof envSchema>;
+
+const PLACEHOLDER_REQUIRED = {
+  SUPABASE_URL: "https://unconfigured.invalid",
+  SUPABASE_SERVICE_ROLE_KEY: "unconfigured-placeholder-service-role-key",
+};
+
+function fallbackEnv(): Env {
+  // Preserve whatever the operator DID set correctly (e.g. NODE_ENV,
+  // API_PORT, CORS_ORIGIN) by dropping only the fields that failed.
+  const cleaned: Record<string, unknown> = { ...process.env, ...PLACEHOLDER_REQUIRED };
+  for (const field of configErrors) {
+    if (!(field in PLACEHOLDER_REQUIRED)) delete cleaned[field];
+  }
+  const withKept = envSchema.safeParse(cleaned);
+  if (withKept.success) return withKept.data;
+
+  // Some other var is malformed too. Retry with the bare minimum, keeping only
+  // NODE_ENV so production still behaves like production. This input is fully
+  // controlled and always valid.
+  const minimal = envSchema.safeParse({
+    NODE_ENV: process.env.NODE_ENV === "production" || process.env.NODE_ENV === "test" ? process.env.NODE_ENV : "development",
+    ...PLACEHOLDER_REQUIRED,
+  });
+  if (minimal.success) {
+    for (const field of Object.keys(withKept.error.flatten().fieldErrors)) {
+      if (!configErrors.includes(field)) configErrors.push(field);
+    }
+    return minimal.data;
+  }
+
+  // Unreachable in practice; keeps the type honest without a throw.
+  configErrors.push("ENV");
+  return {
+    NODE_ENV: "production",
+    API_PORT: 8787,
+    CORS_ORIGIN: "http://localhost:8080",
+    SESSION_SECRET: "dev-session-secret-change-me-32chars",
+    CRASH_ALERT_APP_NAME: "raW",
+    ...PLACEHOLDER_REQUIRED,
+  } as Env;
+}
+
+export const env: Env = parsedEnv.success ? parsedEnv.data : fallbackEnv();
