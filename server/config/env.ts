@@ -13,6 +13,19 @@ const ensureUrlProtocol = (value: unknown) => {
   return /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
 };
 
+const serverEnv = {
+  ...process.env,
+  SUPABASE_URL:
+    emptyToUndefined(process.env.SUPABASE_URL) ??
+    emptyToUndefined(process.env.NEXT_PUBLIC_SUPABASE_URL) ??
+    emptyToUndefined(process.env.VITE_SUPABASE_URL) ??
+    emptyToUndefined(process.env.VITE_PUBLIC_SUPABASE_URL),
+  SUPABASE_SERVICE_ROLE_KEY:
+    emptyToUndefined(process.env.SUPABASE_SERVICE_ROLE_KEY) ??
+    emptyToUndefined(process.env.SUPABASE_SERVICE_KEY) ??
+    emptyToUndefined(process.env.SUPABASE_SECRET_KEY),
+};
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   API_PORT: z.coerce.number().int().positive().default(8787),
@@ -21,8 +34,8 @@ const envSchema = z.object({
     emptyToUndefined,
     z.string().min(32, "SESSION_SECRET must be at least 32 characters.").default("dev-session-secret-change-me-32chars")
   ),
-  SUPABASE_URL: z.preprocess(ensureUrlProtocol, z.string().url()),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(30),
+  SUPABASE_URL: z.preprocess((value) => ensureUrlProtocol(value) ?? "", z.union([z.string().url(), z.literal("")])),
+  SUPABASE_SERVICE_ROLE_KEY: z.preprocess((value) => emptyToUndefined(value) ?? "", z.union([z.string().min(30), z.literal("")])),
   POSTHOG_PROJECT_API_KEY: z.preprocess(emptyToUndefined, z.string().min(20).optional()),
   POSTHOG_HOST: z.preprocess(ensureUrlProtocol, z.string().url().optional()),
   // Crash alert emails (System & Errors tab). Optional: alerts are skipped when unset.
@@ -42,19 +55,18 @@ const envSchema = z.object({
   POSTHOG_PROJECT_ID: z.preprocess(emptyToUndefined, z.string().optional()),
 });
 
-const parsedEnv = envSchema.safeParse(process.env);
+const parsedEnv = envSchema.safeParse(serverEnv);
 
 if (!parsedEnv.success) {
   console.error("[startup] Invalid environment configuration", parsedEnv.error.flatten().fieldErrors);
-  process.exit(1);
 }
 
 if (
+  parsedEnv.success &&
   parsedEnv.data.NODE_ENV === "production" &&
   parsedEnv.data.SESSION_SECRET === "dev-session-secret-change-me-32chars"
 ) {
   console.error("[startup] SESSION_SECRET must be set to a unique value in production.");
-  process.exit(1);
 }
 
-export const env = parsedEnv.data;
+export const env = parsedEnv.success ? parsedEnv.data : envSchema.parse({});
