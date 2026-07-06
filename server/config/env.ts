@@ -57,6 +57,12 @@ const envSchema = z.object({
 
 const parsedEnv = envSchema.safeParse(serverEnv);
 
+// On serverless a process.exit here surfaces as an opaque crashed function.
+// Instead we record which variables are broken and keep the app booting, so
+// /api/health can report the misconfiguration and other routes can refuse
+// requests with a clear error. Variable names only — never values.
+export const configErrors: string[] = [];
+
 if (!parsedEnv.success) {
   console.error("[startup] Invalid environment configuration", parsedEnv.error.flatten().fieldErrors);
 }
@@ -66,6 +72,7 @@ if (
   parsedEnv.data.NODE_ENV === "production" &&
   parsedEnv.data.SESSION_SECRET === "dev-session-secret-change-me-32chars"
 ) {
+  configErrors.push("SESSION_SECRET");
   console.error("[startup] SESSION_SECRET must be set to a unique value in production.");
 }
 
