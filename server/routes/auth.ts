@@ -40,8 +40,8 @@ function toAuthUser(user: DbUser, tier: StaffTier) {
   };
 }
 
-function handleLoginError(error: unknown, res: Response) {
-  console.error("[auth] login failed", error);
+function handleAuthServiceError(action: string, error: unknown, res: Response) {
+  console.error(`[auth] ${action} failed`, error);
 
   if (error instanceof SupabaseAdminError) {
     if (error.status === 401 || error.status === 403) {
@@ -94,7 +94,7 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
     captureServerEvent(req, "admin_signed_in_server", getPostHogDistinctId(req, user.id), { role: user.role, tier });
     return res.status(200).json({ ok: true, user: toAuthUser(user, tier) });
   } catch (error) {
-    return handleLoginError(error, res);
+    return handleAuthServiceError("login", error, res);
   }
 });
 
@@ -104,17 +104,21 @@ authRouter.get("/me", async (req, res) => {
     return res.status(401).json({ error: "Not authenticated." });
   }
 
-  // Re-fetch so bans and tier changes take effect on the next request.
-  const user = await findUserById(session.userId);
-  const tier = user ? resolveTier(user) : null;
-  if (!user || user.status === "banned" || !tier) {
-    clearSessionCookie(res);
-    return res.status(401).json({ error: "Not authenticated." });
-  }
+  try {
+    // Re-fetch so bans and tier changes take effect on the next request.
+    const user = await findUserById(session.userId);
+    const tier = user ? resolveTier(user) : null;
+    if (!user || user.status === "banned" || !tier) {
+      clearSessionCookie(res);
+      return res.status(401).json({ error: "Not authenticated." });
+    }
 
-  setSessionCookie(res, { userId: user.id, username: user.username, role: user.role, tier });
-  captureServerEvent(req, "admin_session_restored_server", getPostHogDistinctId(req, user.id), { role: user.role, tier });
-  return res.status(200).json({ ok: true, user: toAuthUser(user, tier) });
+    setSessionCookie(res, { userId: user.id, username: user.username, role: user.role, tier });
+    captureServerEvent(req, "admin_session_restored_server", getPostHogDistinctId(req, user.id), { role: user.role, tier });
+    return res.status(200).json({ ok: true, user: toAuthUser(user, tier) });
+  } catch (error) {
+    return handleAuthServiceError("session restore", error, res);
+  }
 });
 
 authRouter.post("/logout", (req, res) => {
