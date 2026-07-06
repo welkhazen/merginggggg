@@ -1,8 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Response } from "express";
-import { env } from "../config/env";
-import type { StaffTier } from "./roles";
-import { isStaffTier } from "./roles";
+import { env } from "../config/env.js";
+import type { StaffTier } from "./roles.js";
+import { isStaffTier } from "./roles.js";
 
 // Stateless HMAC-signed session so auth works on serverless (no shared
 // session store between invocations). Same cookie semantics as the previous

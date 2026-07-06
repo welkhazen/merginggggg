@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics";
-import { writeAudit } from "../../lib/audit";
-import { resolveTier, TIER_RANK } from "../../lib/roles";
-import { insertRow, selectRows, updateRows } from "../../lib/supabaseAdmin";
-import { adminSession, requireTier } from "../../middleware/adminAuth";
+import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics.js";
+import { writeAudit } from "../../lib/audit.js";
+import { resolveTier, TIER_RANK } from "../../lib/roles.js";
+import { insertRow, selectRows, updateRows } from "../../lib/supabaseAdmin.js";
+import { adminSession, requireTier } from "../../middleware/adminAuth.js";
 
 type DbUser = {
   id: string;

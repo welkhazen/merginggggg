@@ -1,9 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
-import type { StaffTier } from "../lib/roles";
-import { resolveTier, tierAtLeast } from "../lib/roles";
-import type { AdminSession } from "../lib/sessionToken";
-import { SESSION_COOKIE, verifySessionToken } from "../lib/sessionToken";
-import { selectRows } from "../lib/supabaseAdmin";
+import type { StaffTier } from "../lib/roles.js";
+import { resolveTier, tierAtLeast } from "../lib/roles.js";
+import type { AdminSession } from "../lib/sessionToken.js";
+import { SESSION_COOKIE, verifySessionToken } from "../lib/sessionToken.js";
+import { selectRows } from "../lib/supabaseAdmin.js";
 
 export function getAdminSession(req: Request): AdminSession | null {
   const cookies = (req as Request & { cookies?: Record<string, string> }).cookies ?? {};

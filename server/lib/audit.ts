@@ -1,5 +1,5 @@
-import { insertRow } from "./supabaseAdmin";
-import type { AdminSession } from "./sessionToken";
+import { insertRow } from "./supabaseAdmin.js";
+import type { AdminSession } from "./sessionToken.js";
 
 export type AuditEntry = {
   action: string;
