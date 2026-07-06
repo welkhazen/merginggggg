@@ -38,17 +38,35 @@ const envSchema = z.object({
 
 const parsedEnv = envSchema.safeParse(process.env);
 
+// On serverless a process.exit here surfaces as an opaque crashed function.
+// Instead we record which variables are broken and keep the app booting, so
+// /api/health can report the misconfiguration and other routes can refuse
+// requests with a clear error. Variable names only — never values.
+export const configErrors: string[] = [];
+
 if (!parsedEnv.success) {
-  console.error("[startup] Invalid environment configuration", parsedEnv.error.flatten().fieldErrors);
-  process.exit(1);
+  const fieldErrors = parsedEnv.error.flatten().fieldErrors;
+  configErrors.push(...Object.keys(fieldErrors));
+  console.error("[startup] Invalid environment configuration", fieldErrors);
 }
 
 if (
+  parsedEnv.success &&
   parsedEnv.data.NODE_ENV === "production" &&
   parsedEnv.data.SESSION_SECRET === "dev-session-secret-change-me-32chars"
 ) {
+  configErrors.push("SESSION_SECRET");
   console.error("[startup] SESSION_SECRET must be set to a unique value in production.");
-  process.exit(1);
 }
 
-export const env = parsedEnv.data;
+// Placeholders keep importing modules loadable when config is broken; the
+// /api gate in server/index.ts rejects requests before these are ever used.
+function fallbackEnv() {
+  const input: Record<string, unknown> = { ...process.env };
+  for (const field of configErrors) delete input[field];
+  input.SUPABASE_URL = "https://unconfigured.invalid";
+  input.SUPABASE_SERVICE_ROLE_KEY = "unconfigured-placeholder-service-role-key";
+  return envSchema.parse(input);
+}
+
+export const env = parsedEnv.success ? parsedEnv.data : fallbackEnv();
