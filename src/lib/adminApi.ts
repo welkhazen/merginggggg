@@ -339,6 +339,9 @@ export async function login(username: string, password: string): Promise<AdminUs
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
+  // A stale static deployment can answer 200 with index.html; jsonRequest
+  // then yields an empty body. Treat it as a broken API, not a success.
+  if (!body?.user) throw new Error("api_unavailable");
   return body.user;
 }
 
