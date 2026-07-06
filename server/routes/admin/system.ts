@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import { writeAudit } from "../../lib/audit";
-import { isPostHogQueryConfigured } from "../../lib/posthogQuery";
-import { isCrashAlertEnabled } from "../../lib/resend";
+import { writeAudit } from "../../lib/audit.js";
+import { isPostHogQueryConfigured } from "../../lib/posthogQuery.js";
+import { isCrashAlertEnabled } from "../../lib/resend.js";
 import {
   fetchSupabaseAdvisors,
   fetchSupabaseLogs,
@@ -10,9 +10,9 @@ import {
   isSupabaseMgmtConfigured,
   isVercelConfigured,
   supabaseProjectRef,
-} from "../../lib/systemIntegrations";
-import { selectRows, updateRows } from "../../lib/supabaseAdmin";
-import { adminSession } from "../../middleware/adminAuth";
+} from "../../lib/systemIntegrations.js";
+import { selectRows, updateRows } from "../../lib/supabaseAdmin.js";
+import { adminSession } from "../../middleware/adminAuth.js";
 
 type ErrorEventRow = {
   id: string;
