@@ -7,6 +7,12 @@ loadEnv();
 const emptyToUndefined = (value: unknown) =>
   typeof value === "string" && value.trim() === "" ? undefined : value;
 
+const ensureUrlProtocol = (value: unknown) => {
+  const cleaned = emptyToUndefined(value);
+  if (typeof cleaned !== "string") return cleaned;
+  return /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+};
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   API_PORT: z.coerce.number().int().positive().default(8787),
@@ -15,10 +21,10 @@ const envSchema = z.object({
     emptyToUndefined,
     z.string().min(32, "SESSION_SECRET must be at least 32 characters.").default("dev-session-secret-change-me-32chars")
   ),
-  SUPABASE_URL: z.string().url(),
+  SUPABASE_URL: z.preprocess(ensureUrlProtocol, z.string().url()),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(30),
   POSTHOG_PROJECT_API_KEY: z.preprocess(emptyToUndefined, z.string().min(20).optional()),
-  POSTHOG_HOST: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  POSTHOG_HOST: z.preprocess(ensureUrlProtocol, z.string().url().optional()),
   // Crash alert emails (System & Errors tab). Optional: alerts are skipped when unset.
   RESEND_API_KEY: z.preprocess(emptyToUndefined, z.string().min(10).optional()),
   CRASH_ALERT_FROM: z.preprocess(emptyToUndefined, z.string().optional()),
