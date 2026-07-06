@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import { writeAudit } from "../../lib/audit";
-import { insertRow, rpc, selectRows, updateRows } from "../../lib/supabaseAdmin";
-import { adminSession } from "../../middleware/adminAuth";
+import { writeAudit } from "../../lib/audit.js";
+import { insertRow, rpc, selectRows, updateRows } from "../../lib/supabaseAdmin.js";
+import { adminSession } from "../../middleware/adminAuth.js";
 
 type CommunityRow = {
   id: string;

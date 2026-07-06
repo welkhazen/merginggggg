@@ -6,10 +6,10 @@ import helmet from "helmet";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import rateLimit from "express-rate-limit";
-import { configErrors, env } from "./config/env";
-import { adminRouter } from "./routes/admin/index";
-import { authRouter } from "./routes/auth";
-import { errorsRouter } from "./routes/errors";
+import { configErrors, env } from "./config/env.js";
+import { adminRouter } from "./routes/admin/index.js";
+import { authRouter } from "./routes/auth.js";
+import { errorsRouter } from "./routes/errors.js";
 
 const app = express();
 const isProduction = env.NODE_ENV === "production";

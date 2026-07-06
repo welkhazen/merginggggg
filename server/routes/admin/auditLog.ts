@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { selectRows } from "../../lib/supabaseAdmin";
+import { selectRows } from "../../lib/supabaseAdmin.js";
 
 const auditQuerySchema = z.object({
   action: z.string().trim().max(60).optional(),
