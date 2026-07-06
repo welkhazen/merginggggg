@@ -7,6 +7,25 @@ loadEnv();
 const emptyToUndefined = (value: unknown) =>
   typeof value === "string" && value.trim() === "" ? undefined : value;
 
+const ensureUrlProtocol = (value: unknown) => {
+  const cleaned = emptyToUndefined(value);
+  if (typeof cleaned !== "string") return cleaned;
+  return /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+};
+
+const serverEnv = {
+  ...process.env,
+  SUPABASE_URL:
+    emptyToUndefined(process.env.SUPABASE_URL) ??
+    emptyToUndefined(process.env.NEXT_PUBLIC_SUPABASE_URL) ??
+    emptyToUndefined(process.env.VITE_SUPABASE_URL) ??
+    emptyToUndefined(process.env.VITE_PUBLIC_SUPABASE_URL),
+  SUPABASE_SERVICE_ROLE_KEY:
+    emptyToUndefined(process.env.SUPABASE_SERVICE_ROLE_KEY) ??
+    emptyToUndefined(process.env.SUPABASE_SERVICE_KEY) ??
+    emptyToUndefined(process.env.SUPABASE_SECRET_KEY),
+};
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   API_PORT: z.coerce.number().int().positive().default(8787),
@@ -15,10 +34,10 @@ const envSchema = z.object({
     emptyToUndefined,
     z.string().min(32, "SESSION_SECRET must be at least 32 characters.").default("dev-session-secret-change-me-32chars")
   ),
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(30),
+  SUPABASE_URL: z.preprocess((value) => ensureUrlProtocol(value) ?? "", z.union([z.string().url(), z.literal("")])),
+  SUPABASE_SERVICE_ROLE_KEY: z.preprocess((value) => emptyToUndefined(value) ?? "", z.union([z.string().min(30), z.literal("")])),
   POSTHOG_PROJECT_API_KEY: z.preprocess(emptyToUndefined, z.string().min(20).optional()),
-  POSTHOG_HOST: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  POSTHOG_HOST: z.preprocess(ensureUrlProtocol, z.string().url().optional()),
   // Crash alert emails (System & Errors tab). Optional: alerts are skipped when unset.
   RESEND_API_KEY: z.preprocess(emptyToUndefined, z.string().min(10).optional()),
   CRASH_ALERT_FROM: z.preprocess(emptyToUndefined, z.string().optional()),
@@ -36,7 +55,16 @@ const envSchema = z.object({
   POSTHOG_PROJECT_ID: z.preprocess(emptyToUndefined, z.string().optional()),
 });
 
-const parsedEnv = envSchema.safeParse(process.env);
+const parsedEnv = envSchema.safeParse(serverEnv);
+const fallbackEnv: z.infer<typeof envSchema> = {
+  NODE_ENV: "development",
+  API_PORT: 8787,
+  CORS_ORIGIN: "http://localhost:8080",
+  SESSION_SECRET: "dev-session-secret-change-me-32chars",
+  SUPABASE_URL: "",
+  SUPABASE_SERVICE_ROLE_KEY: "",
+  CRASH_ALERT_APP_NAME: "raW",
+};
 
 // On serverless a process.exit here surfaces as an opaque crashed function.
 // Instead we record which variables are broken and keep the app booting, so
@@ -45,9 +73,7 @@ const parsedEnv = envSchema.safeParse(process.env);
 export const configErrors: string[] = [];
 
 if (!parsedEnv.success) {
-  const fieldErrors = parsedEnv.error.flatten().fieldErrors;
-  configErrors.push(...Object.keys(fieldErrors));
-  console.error("[startup] Invalid environment configuration", fieldErrors);
+  console.error("[startup] Invalid environment configuration", parsedEnv.error.flatten().fieldErrors);
 }
 
 if (

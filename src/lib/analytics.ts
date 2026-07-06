@@ -1,7 +1,16 @@
 import posthog from "posthog-js";
 
-const token = import.meta.env.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN as string | undefined;
-const host = (import.meta.env.VITE_PUBLIC_POSTHOG_HOST as string | undefined) ?? "https://us.i.posthog.com";
+const token = (import.meta.env.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN ?? import.meta.env.VITE_POSTHOG_KEY) as
+  | string
+  | undefined;
+const configuredHost = (import.meta.env.VITE_PUBLIC_POSTHOG_HOST ?? import.meta.env.VITE_POSTHOG_HOST) as
+  | string
+  | undefined;
+const host = configuredHost
+  ? /^https?:\/\//i.test(configuredHost)
+    ? configuredHost
+    : `https://${configuredHost}`
+  : "https://us.i.posthog.com";
 
 export const isPostHogEnabled = Boolean(token);
 
