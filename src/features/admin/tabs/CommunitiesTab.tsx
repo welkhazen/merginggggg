@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Lock, LockOpen, MessageSquareReply, RefreshCw, Send, Trash2, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
+import { isCommunityRealtimeConfigured, subscribeToCommunityMessages, unsubscribeFromCommunityMessages } from "@/lib/communityRealtime";
 import {
   deleteCommunityMessage,
   fetchCommunities,
@@ -86,16 +87,52 @@ function CommunityInspector({ community }: { community: CommunitySummary }) {
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<CommunityMessage | null>(null);
   const [sending, setSending] = useState(false);
-  const { data: messageData, reload: reloadMessages } = useAsyncData(() => fetchCommunityMessages(community.id, filter), [community.id, filter]);
+  const { data: messageData, setData: setMessageData, reload: reloadMessages } = useAsyncData(() => fetchCommunityMessages(community.id, filter), [community.id, filter]);
+  const [realtimeFallback, setRealtimeFallback] = useState(!isCommunityRealtimeConfigured());
   const members = useAsyncData(() => fetchCommunityMembers(community.id), [community.id]);
 
   useEffect(() => {
+    setRealtimeFallback(!isCommunityRealtimeConfigured());
+  }, [community.id]);
+
+  useEffect(() => {
     if (view !== "messages") return;
+
+    const channel = subscribeToCommunityMessages(
+      community.id,
+      (message, eventType) => {
+        if (filter === "deleted" && !message.isDeleted) return;
+        if (filter === "flagged" && !message.moderationStatus) return;
+
+        setMessageData((current) => {
+          const messages = current ?? [];
+          if (eventType === "DELETE") return messages.filter((item) => item.id !== message.id);
+
+          const next = [message, ...messages.filter((item) => item.id !== message.id)];
+          return next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 50);
+        });
+      },
+      () => {
+        setRealtimeFallback(true);
+      },
+    );
+
+    if (!channel) {
+      setRealtimeFallback(true);
+      return;
+    }
+
+    setRealtimeFallback(false);
+    return () => unsubscribeFromCommunityMessages(channel);
+  }, [community.id, filter, setMessageData, view]);
+
+  useEffect(() => {
+    if (view !== "messages" || !realtimeFallback) return;
     const timer = window.setInterval(() => {
       reloadMessages();
     }, 3000);
     return () => window.clearInterval(timer);
-  }, [reloadMessages, view]);
+  }, [realtimeFallback, reloadMessages, view]);
 
   async function removeMessage(message: CommunityMessage) {
     const reason = window.prompt(`Delete this message from @${message.senderName ?? "unknown"}?\nOptional reason:`);
@@ -134,7 +171,7 @@ function CommunityInspector({ community }: { community: CommunitySummary }) {
   return (
     <Panel
       title={`Inspecting: ${community.title}`}
-      hint="Messages include deleted and flagged content; deletions here are soft deletes visible to the main app."
+      hint={realtimeFallback ? "Realtime is unavailable, so this view is temporarily falling back to 3-second refreshes." : "Realtime is active for messages; deletions here are soft deletes visible to the main app."}
       actions={
         <div className="flex gap-2">
           <SelectField value={view} onChange={(event) => setView(event.target.value as typeof view)}>
