@@ -2,12 +2,12 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import type { Response } from "express";
 import { z } from "zod";
-import { captureServerEvent, getPostHogDistinctId } from "../lib/analytics";
-import type { StaffTier } from "../lib/roles";
-import { resolveTier } from "../lib/roles";
-import { clearSessionCookie, setSessionCookie } from "../lib/sessionToken";
-import { SupabaseAdminError, rpc, selectRows } from "../lib/supabaseAdmin";
-import { getAdminSession } from "../middleware/adminAuth";
+import { captureServerEvent, getPostHogDistinctId } from "../lib/analytics.js";
+import type { StaffTier } from "../lib/roles.js";
+import { resolveTier } from "../lib/roles.js";
+import { clearSessionCookie, setSessionCookie } from "../lib/sessionToken.js";
+import { SupabaseAdminError, rpc, selectRows } from "../lib/supabaseAdmin.js";
+import { getAdminSession } from "../middleware/adminAuth.js";
 
 type DbUser = {
   id: string;

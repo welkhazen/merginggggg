@@ -73,6 +73,11 @@ export type CommunityMessage = {
   replyToText: string | null;
 };
 
+export type SendCommunityMessageInput = {
+  text: string;
+  replyToMessageId?: string;
+};
+
 export type CommunityMember = {
   userId: string;
   username: string | null;
@@ -380,6 +385,17 @@ export async function fetchCommunityMessages(
   return body.messages;
 }
 
+export async function sendCommunityMessage(id: string, input: SendCommunityMessageInput): Promise<CommunityMessage> {
+  const body = await jsonRequest<{ message: CommunityMessage }>(
+    `/api/admin/communities/${encodeURIComponent(id)}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return body.message;
+}
+
 export async function fetchCommunityMembers(id: string): Promise<CommunityMember[]> {
   const body = await jsonRequest<{ members: CommunityMember[] }>(
     `/api/admin/communities/${encodeURIComponent(id)}/members`,
@@ -445,6 +461,12 @@ export async function moderateUser(
   await jsonRequest<{ ok: true }>("/api/admin/moderate-user", {
     method: "POST",
     body: JSON.stringify({ username, action, minutes, reason }),
+  });
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await jsonRequest<{ ok: true }>(`/api/admin/users/${encodeURIComponent(id)}`, {
+    method: "DELETE",
   });
 }
 

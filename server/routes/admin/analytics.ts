@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { isPostHogQueryConfigured, runHogQL } from "../../lib/posthogQuery";
+import { isPostHogQueryConfigured, runHogQL } from "../../lib/posthogQuery.js";
 
 export const analyticsRouter = Router();
 

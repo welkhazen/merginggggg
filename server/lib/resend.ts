@@ -1,4 +1,4 @@
-import { env } from "../config/env";
+import { env } from "../config/env.js";
 
 export const isCrashAlertEnabled = Boolean(env.RESEND_API_KEY && env.CRASH_ALERT_FROM && env.CRASH_ALERT_TO);
 

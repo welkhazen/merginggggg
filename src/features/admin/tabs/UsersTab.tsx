@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Ban, RefreshCw, Search, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Ban, RefreshCw, Search, ShieldCheck, Trash2, TriangleAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
 import {
   fetchAppeals,
   fetchUserDetail,
   fetchUsers,
+  deleteUser,
   moderateUser,
   reviewAppeal,
   TIER_LABELS,
@@ -31,6 +32,20 @@ export function UsersTab() {
     } catch (error) {
       captureAdminException(error, { action: "admin_user_detail" });
       toast({ title: "Could not load user" });
+    }
+  }
+
+  async function removeUser(user: ManagedUser) {
+    if (!window.confirm(`Permanently delete @${user.username}? This cannot be undone.`)) return;
+    try {
+      await deleteUser(user.id);
+      captureAdminEvent("admin_user_deleted", { target_username: user.username });
+      toast({ title: "User deleted", description: `@${user.username} was removed.` });
+      if (detail?.user.id === user.id) setDetail(null);
+      reload();
+    } catch (error) {
+      captureAdminException(error, { action: "admin_user_delete" });
+      toast({ title: "Could not delete user", description: error instanceof Error ? error.message : undefined });
     }
   }
 
@@ -78,7 +93,12 @@ export function UsersTab() {
                   Joined {formatDate(user.createdAt)} · Last seen {formatDate(user.lastSeenAt)} · {user.tokenBalance} tokens
                 </p>
               </div>
-              <AdminButton tone="outline" onClick={() => void openDetail(user)}>Open</AdminButton>
+              <div className="flex gap-2">
+                <AdminButton tone="outline" onClick={() => void openDetail(user)}>Open</AdminButton>
+                <AdminButton tone="danger" onClick={() => void removeUser(user)} aria-label={`Delete ${user.username}`}>
+                  <Trash2 className="h-4 w-4" /> Delete
+                </AdminButton>
+              </div>
             </Row>
           ))}
         </div>

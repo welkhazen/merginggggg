@@ -6,10 +6,11 @@ import helmet from "helmet";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import rateLimit from "express-rate-limit";
-import { configErrors, env } from "./config/env";
-import { adminRouter } from "./routes/admin/index";
-import { authRouter } from "./routes/auth";
-import { errorsRouter } from "./routes/errors";
+import { configErrors, env } from "./config/env.js";
+import { adminRouter } from "./routes/admin/index.js";
+import { authRouter } from "./routes/auth.js";
+import { errorsRouter } from "./routes/errors.js";
+import { waitlistRouter } from "./routes/waitlist.js";
 
 const app = express();
 const isProduction = env.NODE_ENV === "production";
@@ -85,6 +86,7 @@ if (configErrors.length > 0) {
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/errors", errorsRouter);
+app.use("/api/waitlist", waitlistRouter);
 
 // Static SPA serving for the classic long-running deployment. On Vercel the
 // CDN serves dist/ and only /api/* reaches this app.

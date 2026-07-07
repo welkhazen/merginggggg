@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
-import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics";
-import { writeAudit } from "../../lib/audit";
-import { deleteRows, insertRow, selectRows } from "../../lib/supabaseAdmin";
-import { adminSession } from "../../middleware/adminAuth";
+import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics.js";
+import { writeAudit } from "../../lib/audit.js";
+import { deleteRows, insertRow, selectRows } from "../../lib/supabaseAdmin.js";
+import { adminSession } from "../../middleware/adminAuth.js";
 
 type BlockedWordRow = {
   id: string;
@@ -121,8 +121,8 @@ wordsRouter.post("/banned-words", async (req, res) => {
   const row = await insertRow<BannedWordRow>("banned_words", {
     word: parsed.data.word,
     normalized_word: parsed.data.word.toLowerCase(),
-    action: parsed.data.action,
-    category: parsed.data.category ?? null,
+    action: parsed.data.action.toUpperCase(),
+    category: parsed.data.category?.toUpperCase() ?? null,
     added_by: session.username,
   });
   await writeAudit(session, {
