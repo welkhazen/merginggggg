@@ -15,15 +15,20 @@ type NodeHandler = (req: IncomingMessage, res: ServerResponse) => unknown;
 
 const require = createRequire(import.meta.url);
 
-let app: NodeHandler;
-try {
-  const mod = require("./_server/index.cjs") as { default?: NodeHandler } | NodeHandler;
-  app = (typeof mod === "function" ? mod : mod.default) as NodeHandler;
-  if (typeof app !== "function") throw new Error("server bundle did not export an app");
-} catch (error) {
-  const detail = error instanceof Error ? error.message : String(error);
-  console.error("[api] Failed to load server bundle", error);
-  app = (_req, res) => {
+async function loadApp(): Promise<NodeHandler> {
+  if (cachedApp) return cachedApp;
+  const mod = (await import("../server/index.js")) as { default: NodeHandler };
+  cachedApp = mod.default;
+  return cachedApp;
+}
+
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  try {
+    const app = await loadApp();
+    return app(req, res);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error("[api] Failed to initialize server", error);
     res.statusCode = 500;
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify({ error: "server_init_failed", detail }));

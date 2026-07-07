@@ -3,7 +3,7 @@ import { z } from "zod";
 import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics.js";
 import { writeAudit } from "../../lib/audit.js";
 import { resolveTier, TIER_RANK } from "../../lib/roles.js";
-import { insertRow, selectRows, updateRows } from "../../lib/supabaseAdmin.js";
+import { deleteRows, insertRow, selectRows, updateRows } from "../../lib/supabaseAdmin.js";
 import { adminSession, requireTier } from "../../middleware/adminAuth.js";
 
 type DbUser = {
@@ -149,6 +149,35 @@ usersRouter.get("/users/:id", requireTier("admin"), async (req, res) => {
       createdAt: appeal.created_at,
     })),
   });
+});
+
+usersRouter.delete("/users/:id", requireTier("admin"), async (req, res) => {
+  const session = adminSession(res);
+  const rows = await selectRows<DbUser>("users", {
+    select: USER_SELECT,
+    id: `eq.${req.params.id}`,
+    limit: 1,
+  });
+  const target = rows[0];
+  if (!target) return res.status(404).json({ error: "user_not_found" });
+  if (target.id === session.userId) return res.status(400).json({ error: "cannot_delete_self" });
+
+  const targetTier = resolveTier(target);
+  if (targetTier && TIER_RANK[targetTier] >= TIER_RANK[session.tier]) {
+    return res.status(403).json({ error: "cannot_delete_staff" });
+  }
+
+  await deleteRows("users", { id: `eq.${target.id}` });
+  await writeAudit(session, {
+    action: "user_deleted",
+    targetType: "user",
+    targetId: target.id,
+    targetLabel: target.username,
+  });
+  captureServerEvent(req, "admin_user_deleted_server", getPostHogDistinctId(req, session.userId), {
+    target_role: target.role,
+  });
+  return res.status(200).json({ ok: true });
 });
 
 // Kept at its original path so existing clients keep working.

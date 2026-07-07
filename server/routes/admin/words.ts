@@ -121,8 +121,8 @@ wordsRouter.post("/banned-words", async (req, res) => {
   const row = await insertRow<BannedWordRow>("banned_words", {
     word: parsed.data.word,
     normalized_word: parsed.data.word.toLowerCase(),
-    action: parsed.data.action,
-    category: parsed.data.category ?? null,
+    action: parsed.data.action.toUpperCase(),
+    category: parsed.data.category?.toUpperCase() ?? null,
     added_by: session.username,
   });
   await writeAudit(session, {

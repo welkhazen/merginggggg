@@ -38,6 +38,11 @@ const deleteMessageSchema = z.object({
   reason: z.string().trim().max(300).optional(),
 });
 
+const sendMessageSchema = z.object({
+  text: z.string().trim().min(1).max(1000),
+  replyToMessageId: z.string().uuid().optional(),
+});
+
 const messagesQuerySchema = z.object({
   filter: z.enum(["all", "deleted", "flagged"]).default("all"),
   before: z.string().datetime({ offset: true }).optional(),
@@ -71,6 +76,28 @@ communitiesRouter.get("/communities", async (_req, res) => {
       locked: Boolean(community.locked),
       createdAt: community.created_at,
       memberCount: memberCounts.get(community.id) ?? 0,
+    })),
+  });
+});
+
+communitiesRouter.get("/communities/open", async (_req, res) => {
+  const rows = await selectRows<CommunityRow>("communities", {
+    select: "id,abbr,title,topic,status,locked,created_at",
+    locked: "eq.false",
+    order: "created_at.asc",
+    limit: 3,
+  });
+
+  return res.status(200).json({
+    communities: rows.map((community) => ({
+      id: community.id,
+      abbr: community.abbr,
+      title: community.title,
+      topic: community.topic,
+      status: community.status,
+      locked: Boolean(community.locked),
+      createdAt: community.created_at,
+      memberCount: 0,
     })),
   });
 });
@@ -129,6 +156,69 @@ communitiesRouter.get("/communities/:id/messages", async (req, res) => {
       replyToSenderName: row.reply_to_sender_name,
       replyToText: row.reply_to_text,
     })),
+  });
+});
+
+communitiesRouter.post("/communities/:id/messages", async (req, res) => {
+  const parsed = sendMessageSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
+
+  const session = adminSession(res);
+  const communityRows = await selectRows<CommunityRow>("communities", {
+    select: "id,abbr,title,topic,status,locked,created_at",
+    id: `eq.${req.params.id}`,
+    locked: "eq.false",
+    limit: 1,
+  });
+  const community = communityRows[0];
+  if (!community) return res.status(404).json({ error: "open_community_not_found" });
+
+  let replyTo: MessageRow | null = null;
+  if (parsed.data.replyToMessageId) {
+    const replyRows = await selectRows<MessageRow>("community_messages", {
+      select:
+        "id,community_id,sender_id,sender_name,text,created_at,is_deleted,deleted_by,deleted_reason,moderation_status,reply_to_sender_name,reply_to_text",
+      id: `eq.${parsed.data.replyToMessageId}`,
+      community_id: `eq.${req.params.id}`,
+      limit: 1,
+    });
+    replyTo = replyRows[0] ?? null;
+    if (!replyTo) return res.status(404).json({ error: "reply_message_not_found" });
+  }
+
+  const row = await insertRow<MessageRow>("community_messages", {
+    community_id: req.params.id,
+    sender_id: session.userId,
+    sender_name: session.username,
+    text: parsed.data.text,
+    moderation_status: "staff_reply",
+    reply_to_sender_name: replyTo?.sender_name ?? null,
+    reply_to_text: replyTo?.text ?? null,
+  });
+
+  await writeAudit(session, {
+    action: "community_message_sent",
+    targetType: "community",
+    targetId: req.params.id,
+    targetLabel: community.title,
+    details: { replyToMessageId: parsed.data.replyToMessageId ?? null },
+  });
+
+  return res.status(200).json({
+    message: {
+      id: row.id,
+      communityId: row.community_id,
+      senderId: row.sender_id,
+      senderName: row.sender_name,
+      text: row.text,
+      createdAt: row.created_at,
+      isDeleted: Boolean(row.is_deleted),
+      deletedBy: row.deleted_by,
+      deletedReason: row.deleted_reason,
+      moderationStatus: row.moderation_status,
+      replyToSenderName: row.reply_to_sender_name,
+      replyToText: row.reply_to_text,
+    },
   });
 });
 
