@@ -13,7 +13,7 @@ let cachedApp: NodeHandler | null = null;
 
 async function loadApp(): Promise<NodeHandler> {
   if (cachedApp) return cachedApp;
-  const mod = (await import("../server/index")) as { default: NodeHandler };
+  const mod = (await import("../server/index.js")) as { default: NodeHandler };
   cachedApp = mod.default;
   return cachedApp;
 }

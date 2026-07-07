@@ -56,15 +56,6 @@ const envSchema = z.object({
 });
 
 const parsedEnv = envSchema.safeParse(serverEnv);
-const fallbackEnv: z.infer<typeof envSchema> = {
-  NODE_ENV: "development",
-  API_PORT: 8787,
-  CORS_ORIGIN: "http://localhost:8080",
-  SESSION_SECRET: "dev-session-secret-change-me-32chars",
-  SUPABASE_URL: "",
-  SUPABASE_SERVICE_ROLE_KEY: "",
-  CRASH_ALERT_APP_NAME: "raW",
-};
 
 // On serverless a process.exit here surfaces as an opaque crashed function.
 // Instead we record which variables are broken and keep the app booting, so
