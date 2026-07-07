@@ -1,8 +1,24 @@
+import { createHash } from "node:crypto";
 import { config as loadEnv } from "dotenv";
 import { z } from "zod";
 
 loadEnv({ path: ".env.local" });
 loadEnv();
+
+// Well-known dev default. It lives in source, so signing production session
+// cookies with it would let anyone forge a session — it must never be used
+// outside development.
+const DEV_SESSION_SECRET = "dev-session-secret-change-me-32chars";
+const PLACEHOLDER_SERVICE_ROLE_KEY = "unconfigured-placeholder-service-role-key";
+
+// Deterministically derive a stable 256-bit signing secret from an already-set,
+// server-only high-entropy secret (the Supabase service role key). Every
+// serverless instance derives the identical value, so HMAC-signed session
+// cookies verify across cold starts and concurrent instances with no shared
+// store — and the secret is only as exposed as the service role key itself,
+// which is already the app's most privileged credential.
+const deriveSessionSecret = (source: string) =>
+  createHash("sha256").update(`raw-session-secret:${source}`).digest("hex");
 
 const emptyToUndefined = (value: unknown) =>
   typeof value === "string" && value.trim() === "" ? undefined : value;
@@ -70,10 +86,21 @@ if (!parsedEnv.success) {
 if (
   parsedEnv.success &&
   parsedEnv.data.NODE_ENV === "production" &&
-  parsedEnv.data.SESSION_SECRET === "dev-session-secret-change-me-32chars"
+  parsedEnv.data.SESSION_SECRET === DEV_SESSION_SECRET
 ) {
-  configErrors.push("SESSION_SECRET");
-  console.error("[startup] SESSION_SECRET must be set to a unique value in production.");
+  const serviceRoleKey = parsedEnv.data.SUPABASE_SERVICE_ROLE_KEY;
+  const hasUsableServiceKey = serviceRoleKey.length >= 30 && serviceRoleKey !== PLACEHOLDER_SERVICE_ROLE_KEY;
+  if (hasUsableServiceKey) {
+    // No explicit SESSION_SECRET was set, but a real service role key is
+    // present: derive a stable secret from it so the app boots and sessions
+    // work out of the box, rather than refusing to start over a missing var.
+    parsedEnv.data.SESSION_SECRET = deriveSessionSecret(serviceRoleKey);
+    console.warn("[startup] SESSION_SECRET not set; deriving a stable secret from SUPABASE_SERVICE_ROLE_KEY.");
+  } else {
+    // Nothing usable to derive from — surface it so /api/health can report it.
+    configErrors.push("SESSION_SECRET");
+    console.error("[startup] SESSION_SECRET must be set to a unique value in production.");
+  }
 }
 
 // Placeholders keep importing modules loadable when config is broken; the
@@ -86,7 +113,7 @@ type Env = z.infer<typeof envSchema>;
 
 const PLACEHOLDER_REQUIRED = {
   SUPABASE_URL: "https://unconfigured.invalid",
-  SUPABASE_SERVICE_ROLE_KEY: "unconfigured-placeholder-service-role-key",
+  SUPABASE_SERVICE_ROLE_KEY: PLACEHOLDER_SERVICE_ROLE_KEY,
 };
 
 function fallbackEnv(): Env {
@@ -119,7 +146,7 @@ function fallbackEnv(): Env {
     NODE_ENV: "production",
     API_PORT: 8787,
     CORS_ORIGIN: "http://localhost:8080",
-    SESSION_SECRET: "dev-session-secret-change-me-32chars",
+    SESSION_SECRET: DEV_SESSION_SECRET,
     CRASH_ALERT_APP_NAME: "raW",
     ...PLACEHOLDER_REQUIRED,
   } as Env;
