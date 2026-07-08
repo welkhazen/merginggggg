@@ -51,6 +51,14 @@ function handleAuthServiceError(action: string, error: unknown, res: Response) {
     if (error.status === 404) {
       return res.status(503).json({ error: "Authentication service is missing required database setup." });
     }
+
+    if (error.status >= 500) {
+      return res.status(503).json({ error: "Authentication service is temporarily unavailable." });
+    }
+  }
+
+  if (error instanceof TypeError) {
+    return res.status(503).json({ error: "Authentication service is unreachable." });
   }
 
   return res.status(503).json({ error: "Authentication service is temporarily unavailable." });

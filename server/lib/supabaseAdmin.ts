@@ -38,7 +38,14 @@ function queryString(params: Record<string, QueryValue>) {
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
-  const body = text ? (JSON.parse(text) as { message?: string; code?: string }) : null;
+  let body: { message?: string; code?: string } | null = null;
+  if (text) {
+    try {
+      body = JSON.parse(text) as { message?: string; code?: string };
+    } catch {
+      body = { message: text.slice(0, 200) };
+    }
+  }
   if (!response.ok) {
     throw new SupabaseAdminError(body?.message ?? body?.code ?? "supabase_request_failed", response.status);
   }
