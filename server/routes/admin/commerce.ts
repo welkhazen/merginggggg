@@ -18,6 +18,7 @@ type TokenRequestRow = {
   id: string;
   user_id: string | null;
   username: string | null;
+  tokens: number | null;
   price_usd: number | null;
   reasons: string[] | null;
   note: string | null;
@@ -94,7 +95,7 @@ commerceRouter.delete("/donation-interests", async (req, res) => {
 commerceRouter.get("/token-requests", async (req, res) => {
   const status = typeof req.query.status === "string" ? req.query.status : "all";
   const params: Record<string, string | number> = {
-    select: "id,user_id,username,price_usd,reasons,note,status,created_at",
+    select: "id,user_id,username,tokens,price_usd,reasons,note,status,created_at",
     order: "created_at.desc",
     limit: 100,
   };
@@ -106,6 +107,7 @@ commerceRouter.get("/token-requests", async (req, res) => {
       id: row.id,
       userId: row.user_id,
       username: row.username,
+      tokens: row.tokens,
       priceUsd: row.price_usd,
       reasons: row.reasons ?? [],
       note: row.note,
