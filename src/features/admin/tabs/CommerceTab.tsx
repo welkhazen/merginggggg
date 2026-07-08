@@ -1,4 +1,5 @@
 import { RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
 import {
@@ -82,12 +83,16 @@ function DonationsPanel() {
 
 function TokenRequestsPanel() {
   const { data: requests, loading, reload } = useAsyncData(() => fetchTokenRequests("all"));
+  const [tokenAmounts, setTokenAmounts] = useState<Record<string, string>>({});
   const canReview = (status: string) => status === "pending" || status === "new";
 
   async function review(id: string, status: "approved" | "rejected") {
+    const customTokens = Number.parseInt(tokenAmounts[id] ?? "", 10);
+    const tokens = status === "approved" && Number.isFinite(customTokens) && customTokens > 0 ? customTokens : undefined;
+
     try {
-      await updateTokenRequest(id, status);
-      captureAdminEvent("admin_token_request_reviewed", { status });
+      await updateTokenRequest(id, status, tokens);
+      captureAdminEvent("admin_token_request_reviewed", { status, customTokens: tokens });
       toast({ title: `Token request ${status}` });
       reload();
     } catch (error) {
@@ -122,7 +127,17 @@ function TokenRequestsPanel() {
               <p className="mt-1 text-[10px] text-raw-silver/35">{formatDate(request.createdAt)}</p>
             </div>
             {canReview(request.status) && (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
+                <input
+                  className="min-h-10 w-24 rounded-xl border border-raw-border/30 bg-raw-black/45 px-3 text-xs text-raw-text placeholder:text-raw-silver/25 focus:border-raw-gold/50 focus:outline-none"
+                  inputMode="numeric"
+                  min={1}
+                  max={100000}
+                  placeholder={request.tokens ? String(request.tokens) : "Tokens"}
+                  type="number"
+                  value={tokenAmounts[request.id] ?? ""}
+                  onChange={(event) => setTokenAmounts((current) => ({ ...current, [request.id]: event.target.value }))}
+                />
                 <AdminButton tone="teal" onClick={() => void review(request.id, "approved")}>Approve</AdminButton>
                 <AdminButton tone="danger" onClick={() => void review(request.id, "rejected")}>Reject</AdminButton>
               </div>
