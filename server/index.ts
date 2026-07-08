@@ -6,11 +6,11 @@ import helmet from "helmet";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import rateLimit from "express-rate-limit";
-import { configErrors, env } from "./config/env.js";
-import { adminRouter } from "./routes/admin/index.js";
-import { authRouter } from "./routes/auth.js";
-import { errorsRouter } from "./routes/errors.js";
-import { waitlistRouter } from "./routes/waitlist.js";
+import { env } from "./config/env";
+import { SupabaseAdminError } from "./lib/supabaseAdmin";
+import { adminRouter } from "./routes/admin/index";
+import { authRouter } from "./routes/auth";
+import { errorsRouter } from "./routes/errors";
 
 const app = express();
 const isProduction = env.NODE_ENV === "production";
@@ -101,6 +101,9 @@ if (!isVercel && existsSync(clientDist)) {
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
+  if (err instanceof SupabaseAdminError) {
+    return res.status(err.status).json({ error: err.message });
+  }
   return res.status(500).json({ error: "Internal server error." });
 });
 

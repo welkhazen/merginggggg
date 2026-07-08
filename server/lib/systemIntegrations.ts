@@ -60,10 +60,20 @@ export async function fetchVercelDeployments(limit = 15): Promise<
   }
 }
 
-export const supabaseProjectRef =
-  env.SUPABASE_PROJECT_REF ?? (env.SUPABASE_URL ? new URL(env.SUPABASE_URL).hostname.split(".")[0] : "");
+function inferSupabaseProjectRef() {
+  if (env.SUPABASE_PROJECT_REF) return env.SUPABASE_PROJECT_REF;
+  if (!env.SUPABASE_URL) return undefined;
 
-export const isSupabaseMgmtConfigured = Boolean(env.SUPABASE_MGMT_TOKEN);
+  try {
+    return new URL(env.SUPABASE_URL).hostname.split(".")[0];
+  } catch {
+    return undefined;
+  }
+}
+
+export const supabaseProjectRef = inferSupabaseProjectRef();
+
+export const isSupabaseMgmtConfigured = Boolean(env.SUPABASE_MGMT_TOKEN && supabaseProjectRef);
 
 export type SupabaseAdvisor = {
   name: string;

@@ -43,8 +43,8 @@ const envSchema = z.object({
     emptyToUndefined,
     z.string().min(32, "SESSION_SECRET must be at least 32 characters.").default(DEFAULT_SESSION_SECRET)
   ),
-  SUPABASE_URL: z.preprocess(ensureUrlProtocol, z.string().url()),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(30),
+  SUPABASE_URL: z.preprocess(ensureUrlProtocol, z.string().url().optional()).default(""),
+  SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().min(30).optional()).default(""),
   POSTHOG_PROJECT_API_KEY: z.preprocess(emptyToUndefined, z.string().min(20).optional()),
   POSTHOG_HOST: z.preprocess(ensureUrlProtocol, z.string().url().optional()),
   // Crash alert emails (System & Errors tab). Optional: alerts are skipped when unset.
@@ -77,11 +77,16 @@ if (!parsedEnv.success) {
 }
 
 if (parsedEnv.data.NODE_ENV === "production" && parsedEnv.data.SESSION_SECRET === DEFAULT_SESSION_SECRET) {
-  parsedEnv.data.SESSION_SECRET = deriveProductionSessionSecret(parsedEnv.data.SUPABASE_SERVICE_ROLE_KEY);
-  console.warn(
-    "[startup] SESSION_SECRET is not set; deriving a stable production session secret from SUPABASE_SERVICE_ROLE_KEY. " +
-      "Set a dedicated SESSION_SECRET in Vercel for cleaner key rotation.",
-  );
+  if (parsedEnv.data.SUPABASE_SERVICE_ROLE_KEY) {
+    parsedEnv.data.SESSION_SECRET = deriveProductionSessionSecret(parsedEnv.data.SUPABASE_SERVICE_ROLE_KEY);
+    console.warn(
+      "[startup] SESSION_SECRET is not set; deriving a stable production session secret from SUPABASE_SERVICE_ROLE_KEY. " +
+        "Set a dedicated SESSION_SECRET in Vercel for cleaner key rotation.",
+    );
+  } else {
+    console.warn("[startup] SESSION_SECRET is not set; using the development secret until Supabase env vars are configured.");
+  }
 }
 
-export const env: Env = parsedEnv.success ? parsedEnv.data : fallbackEnv();
+export const env = parsedEnv.data;
+export const isSupabaseConfigured = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
