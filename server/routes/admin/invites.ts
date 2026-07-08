@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics";
-import { writeAudit } from "../../lib/audit";
-import { insertRows, selectRows } from "../../lib/supabaseAdmin";
-import { adminSession } from "../../middleware/adminAuth";
+import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics.js";
+import { writeAudit } from "../../lib/audit.js";
+import { insertRows, selectRows } from "../../lib/supabaseAdmin.js";
+import { adminSession } from "../../middleware/adminAuth.js";
 
 const inviteSchema = z.object({
   username: z.string().trim().min(3).max(24),

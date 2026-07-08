@@ -65,6 +65,17 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard; minT
   { id: "system", label: "System & errors", icon: ServerCog, minTier: "super_admin" },
 ];
 
+// Distinguishes bad credentials from a broken deployment so a lockout can be
+// diagnosed from the toast instead of guessing.
+function loginErrorDescription(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "Invalid username or password." || message === "Staff access only.") return message;
+  if (message === "server_misconfigured") {
+    return "The server is missing configuration. Check /api/health for the affected environment variables.";
+  }
+  return "The sign-in service did not respond. The deployment may be outdated or missing the API.";
+}
+
 function LoginView({ onLogin }: { onLogin: (user: AdminUser) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -82,7 +93,7 @@ function LoginView({ onLogin }: { onLogin: (user: AdminUser) => void }) {
     } catch (error) {
       captureAdminException(error, { action: "admin_sign_in" });
       captureAdminEvent("admin_sign_in_failed");
-      toast({ title: "Could not sign in", description: "Use a staff account." });
+      toast({ title: "Could not sign in", description: loginErrorDescription(error) });
     } finally {
       setLoading(false);
     }

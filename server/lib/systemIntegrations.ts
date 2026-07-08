@@ -1,4 +1,4 @@
-import { env } from "../config/env";
+import { env } from "../config/env.js";
 
 // Thin read-only clients for the System & Errors tab. Every helper degrades
 // to { configured: false } when its env vars are missing so the portal can
