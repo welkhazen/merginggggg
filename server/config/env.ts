@@ -29,18 +29,11 @@ const ensureUrlProtocol = (value: unknown) => {
   return /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
 };
 
-const serverEnv = {
-  ...process.env,
-  SUPABASE_URL:
-    emptyToUndefined(process.env.SUPABASE_URL) ??
-    emptyToUndefined(process.env.NEXT_PUBLIC_SUPABASE_URL) ??
-    emptyToUndefined(process.env.VITE_SUPABASE_URL) ??
-    emptyToUndefined(process.env.VITE_PUBLIC_SUPABASE_URL),
-  SUPABASE_SERVICE_ROLE_KEY:
-    emptyToUndefined(process.env.SUPABASE_SERVICE_ROLE_KEY) ??
-    emptyToUndefined(process.env.SUPABASE_SERVICE_KEY) ??
-    emptyToUndefined(process.env.SUPABASE_SECRET_KEY),
-};
+const DEFAULT_SESSION_SECRET = "dev-session-secret-change-me-32chars";
+
+function deriveProductionSessionSecret(serviceRoleKey: string) {
+  return createHash("sha256").update(`raw-admin-session:${serviceRoleKey}`).digest("hex");
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -48,10 +41,10 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().url().default("http://localhost:8080"),
   SESSION_SECRET: z.preprocess(
     emptyToUndefined,
-    z.string().min(32, "SESSION_SECRET must be at least 32 characters.").default("dev-session-secret-change-me-32chars")
+    z.string().min(32, "SESSION_SECRET must be at least 32 characters.").default(DEFAULT_SESSION_SECRET)
   ),
-  SUPABASE_URL: z.preprocess((value) => ensureUrlProtocol(value) ?? "", z.union([z.string().url(), z.literal("")])),
-  SUPABASE_SERVICE_ROLE_KEY: z.preprocess((value) => emptyToUndefined(value) ?? "", z.union([z.string().min(30), z.literal("")])),
+  SUPABASE_URL: z.preprocess(ensureUrlProtocol, z.string().url()),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(30),
   POSTHOG_PROJECT_API_KEY: z.preprocess(emptyToUndefined, z.string().min(20).optional()),
   POSTHOG_HOST: z.preprocess(ensureUrlProtocol, z.string().url().optional()),
   // Crash alert emails (System & Errors tab). Optional: alerts are skipped when unset.
@@ -83,73 +76,12 @@ if (!parsedEnv.success) {
   console.error("[startup] Invalid environment configuration", parsedEnv.error.flatten().fieldErrors);
 }
 
-if (
-  parsedEnv.success &&
-  parsedEnv.data.NODE_ENV === "production" &&
-  parsedEnv.data.SESSION_SECRET === DEV_SESSION_SECRET
-) {
-  const serviceRoleKey = parsedEnv.data.SUPABASE_SERVICE_ROLE_KEY;
-  const hasUsableServiceKey = serviceRoleKey.length >= 30 && serviceRoleKey !== PLACEHOLDER_SERVICE_ROLE_KEY;
-  if (hasUsableServiceKey) {
-    // No explicit SESSION_SECRET was set, but a real service role key is
-    // present: derive a stable secret from it so the app boots and sessions
-    // work out of the box, rather than refusing to start over a missing var.
-    parsedEnv.data.SESSION_SECRET = deriveSessionSecret(serviceRoleKey);
-    console.warn("[startup] SESSION_SECRET not set; deriving a stable secret from SUPABASE_SERVICE_ROLE_KEY.");
-  } else {
-    // Nothing usable to derive from — surface it so /api/health can report it.
-    configErrors.push("SESSION_SECRET");
-    console.error("[startup] SESSION_SECRET must be set to a unique value in production.");
-  }
-}
-
-// Placeholders keep importing modules loadable when config is broken; the
-// /api gate in server/index.ts rejects requests before these are ever used.
-// This MUST never throw: a throw at import time crashes the whole serverless
-// function into an opaque FUNCTION_INVOCATION_FAILED, which is exactly the
-// failure mode this module exists to prevent. So we try the real env first,
-// then fall back to a minimal input that cannot fail validation.
-type Env = z.infer<typeof envSchema>;
-
-const PLACEHOLDER_REQUIRED = {
-  SUPABASE_URL: "https://unconfigured.invalid",
-  SUPABASE_SERVICE_ROLE_KEY: PLACEHOLDER_SERVICE_ROLE_KEY,
-};
-
-function fallbackEnv(): Env {
-  // Preserve whatever the operator DID set correctly (e.g. NODE_ENV,
-  // API_PORT, CORS_ORIGIN) by dropping only the fields that failed.
-  const cleaned: Record<string, unknown> = { ...process.env, ...PLACEHOLDER_REQUIRED };
-  for (const field of configErrors) {
-    if (!(field in PLACEHOLDER_REQUIRED)) delete cleaned[field];
-  }
-  const withKept = envSchema.safeParse(cleaned);
-  if (withKept.success) return withKept.data;
-
-  // Some other var is malformed too. Retry with the bare minimum, keeping only
-  // NODE_ENV so production still behaves like production. This input is fully
-  // controlled and always valid.
-  const minimal = envSchema.safeParse({
-    NODE_ENV: process.env.NODE_ENV === "production" || process.env.NODE_ENV === "test" ? process.env.NODE_ENV : "development",
-    ...PLACEHOLDER_REQUIRED,
-  });
-  if (minimal.success) {
-    for (const field of Object.keys(withKept.error.flatten().fieldErrors)) {
-      if (!configErrors.includes(field)) configErrors.push(field);
-    }
-    return minimal.data;
-  }
-
-  // Unreachable in practice; keeps the type honest without a throw.
-  configErrors.push("ENV");
-  return {
-    NODE_ENV: "production",
-    API_PORT: 8787,
-    CORS_ORIGIN: "http://localhost:8080",
-    SESSION_SECRET: DEV_SESSION_SECRET,
-    CRASH_ALERT_APP_NAME: "raW",
-    ...PLACEHOLDER_REQUIRED,
-  } as Env;
+if (parsedEnv.data.NODE_ENV === "production" && parsedEnv.data.SESSION_SECRET === DEFAULT_SESSION_SECRET) {
+  parsedEnv.data.SESSION_SECRET = deriveProductionSessionSecret(parsedEnv.data.SUPABASE_SERVICE_ROLE_KEY);
+  console.warn(
+    "[startup] SESSION_SECRET is not set; deriving a stable production session secret from SUPABASE_SERVICE_ROLE_KEY. " +
+      "Set a dedicated SESSION_SECRET in Vercel for cleaner key rotation.",
+  );
 }
 
 export const env: Env = parsedEnv.success ? parsedEnv.data : fallbackEnv();
