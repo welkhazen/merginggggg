@@ -76,7 +76,7 @@ function mapDonation(row: DonationInterestRow) {
 }
 
 function mapTokenRequest(row: TokenRequestRow | TokenRequestRowWithoutTokens) {
-  const status = row.status === "new" ? "pending" : row.status;
+  const status = row.status === "new" ? "pending" : row.status === "fulfilled" ? "approved" : row.status;
 
   return {
     id: row.id,
@@ -93,6 +93,7 @@ function mapTokenRequest(row: TokenRequestRow | TokenRequestRowWithoutTokens) {
 
 function tokenRequestStatusFilter(status: string): string | undefined {
   if (status === "pending") return "in.(pending,new)";
+  if (status === "approved") return "in.(approved,fulfilled)";
   if (status === "new") return "eq.new";
   if (status === "all") return undefined;
   return `eq.${status}`;
@@ -207,9 +208,24 @@ commerceRouter.patch("/token-requests/:id", async (req, res) => {
         },
       );
     } catch (error) {
-      const mapped = tokenApprovalErrorResponse(error);
-      if (mapped) return res.status(mapped.status).json({ error: mapped.error });
-      throw error;
+      if (error instanceof SupabaseAdminError && error.message === "user_not_found") {
+        approvedRows = await updateRows<Array<{ id: string; username: string | null; credited_tokens: number }>[number]>(
+          "token_requests",
+          { id: `eq.${req.params.id}`, status: "in.(pending,new)" },
+          { tokens: tokenAmount, status: "fulfilled" },
+        ).then((updatedRows) =>
+          updatedRows.map((row) => ({
+            id: row.id,
+            username: row.username,
+            credited_tokens: tokenAmount,
+          })),
+        );
+        if (approvedRows.length === 0) return res.status(409).json({ error: "token_request_already_reviewed" });
+      } else {
+        const mapped = tokenApprovalErrorResponse(error);
+        if (mapped) return res.status(mapped.status).json({ error: mapped.error });
+        throw error;
+      }
     }
     rows = [{ ...requestRow, status: "approved", username: approvedRows[0]?.username ?? requestRow.username }];
     creditedTokens = tokenAmount;

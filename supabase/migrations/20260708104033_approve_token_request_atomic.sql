@@ -37,16 +37,22 @@ begin
     raise exception 'token_request_missing_user' using errcode = 'P0003';
   end if;
 
-  update public.profiles p
+  update public.users p
     set token_balance = coalesce(p.token_balance, 0) + p_token_amount
-    where p.id = v_request.user_id;
+    where p.id::text = v_request.user_id::text;
+
+  if not found and v_request.username is not null then
+    update public.users p
+      set token_balance = coalesce(p.token_balance, 0) + p_token_amount
+      where lower(p.username) = lower(v_request.username);
+  end if;
 
   if not found then
     raise exception 'user_not_found' using errcode = 'P0004';
   end if;
 
   update public.token_requests tr
-    set status = 'approved'
+    set status = 'fulfilled'
     where tr.id = p_request_id
     returning tr.id, tr.username, p_token_amount
     into id, username, credited_tokens;
