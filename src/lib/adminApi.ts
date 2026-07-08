@@ -448,6 +448,12 @@ export async function fetchUsers(options: { q?: string; status?: string; limit?:
   return body.users;
 }
 
+export async function searchUsers(q: string, limit: number = 8): Promise<ManagedUser[]> {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  const body = await jsonRequest<{ users: ManagedUser[] }>(`/api/admin/users/search?${params}`);
+  return body.users;
+}
+
 export async function fetchUserDetail(id: string): Promise<UserDetail> {
   return jsonRequest<UserDetail>(`/api/admin/users/${encodeURIComponent(id)}`);
 }
