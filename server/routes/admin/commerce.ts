@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics.js";
 import { writeAudit } from "../../lib/audit.js";
-import { deleteRows, selectRows, updateRows } from "../../lib/supabaseAdmin.js";
+import { deleteRows, selectRows, SupabaseAdminError, updateRows } from "../../lib/supabaseAdmin.js";
 import { adminSession } from "../../middleware/adminAuth.js";
 
 type DonationInterestRow = {
@@ -26,6 +26,8 @@ type TokenRequestRow = {
   created_at: string;
 };
 
+type TokenRequestRowWithoutTokens = Omit<TokenRequestRow, "tokens">;
+
 const idSchema = z.object({ id: z.string().uuid() });
 
 const donationStatusSchema = z.object({
@@ -46,6 +48,20 @@ function mapDonation(row: DonationInterestRow) {
     phone: row.phone,
     submittedAt: row.submitted_at,
     status: row.status,
+  };
+}
+
+function mapTokenRequest(row: TokenRequestRow | TokenRequestRowWithoutTokens) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    username: row.username,
+    tokens: "tokens" in row ? row.tokens : null,
+    priceUsd: row.price_usd,
+    reasons: row.reasons ?? [],
+    note: row.note,
+    status: row.status,
+    createdAt: row.created_at,
   };
 }
 
@@ -102,19 +118,19 @@ commerceRouter.get("/token-requests", async (req, res) => {
   };
   if (status !== "all") params.status = `eq.${status}`;
 
-  const rows = await selectRows<TokenRequestRow>("token_requests", params);
+  let rows: Array<TokenRequestRow | TokenRequestRowWithoutTokens>;
+  try {
+    rows = await selectRows<TokenRequestRow>("token_requests", params);
+  } catch (error) {
+    if (!(error instanceof SupabaseAdminError) || !error.message.includes("token_requests.tokens")) throw error;
+    rows = await selectRows<TokenRequestRowWithoutTokens>("token_requests", {
+      ...params,
+      select: "id,user_id,username,price_usd,reasons,note,status,created_at",
+    });
+  }
+
   return res.status(200).json({
-    tokenRequests: rows.map((row) => ({
-      id: row.id,
-      userId: row.user_id,
-      username: row.username,
-      tokens: row.tokens,
-      priceUsd: row.price_usd,
-      reasons: row.reasons ?? [],
-      note: row.note,
-      status: row.status,
-      createdAt: row.created_at,
-    })),
+    tokenRequests: rows.map(mapTokenRequest),
   });
 });
 
@@ -128,11 +144,23 @@ commerceRouter.patch("/token-requests/:id", async (req, res) => {
   const updates: { status: "pending" | "approved" | "rejected"; tokens?: number } = { status: parsed.data.status };
   if (parsed.data.tokens !== undefined) updates.tokens = parsed.data.tokens;
 
-  const rows = await updateRows<TokenRequestRow>(
-    "token_requests",
-    { id: `eq.${req.params.id}` },
-    updates,
-  );
+  let rows: TokenRequestRow[];
+  try {
+    rows = await updateRows<TokenRequestRow>(
+      "token_requests",
+      { id: `eq.${req.params.id}` },
+      updates,
+    );
+  } catch (error) {
+    if (
+      error instanceof SupabaseAdminError &&
+      parsed.data.tokens !== undefined &&
+      error.message.includes("token_requests.tokens")
+    ) {
+      return res.status(409).json({ error: "token_request_tokens_column_missing" });
+    }
+    throw error;
+  }
   if (rows.length === 0) return res.status(404).json({ error: "token_request_not_found" });
 
   await writeAudit(adminSession(res), {
