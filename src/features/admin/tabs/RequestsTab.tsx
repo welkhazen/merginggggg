@@ -1,3 +1,4 @@
+import { type StaffTier, tierAtLeast } from "@/lib/adminApi";
 import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -5,9 +6,10 @@ import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
 import { fetchCommunityRequests, reviewCommunityRequest } from "@/lib/adminApi";
 import { AdminButton, EmptyState, formatDate, Panel, Row, SelectField, statusTone, Tag, useAsyncData } from "../ui";
 
-export function RequestsTab() {
+export function RequestsTab({ currentTier }: { currentTier: StaffTier }) {
   const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const { data: requests, loading, reload } = useAsyncData(() => fetchCommunityRequests(status), [status]);
+  const canReview = tierAtLeast(currentTier, "admin");
 
   async function review(id: string, outcome: "approved" | "rejected") {
     try {
@@ -60,7 +62,7 @@ export function RequestsTab() {
                 <p className="mt-1 text-xs text-raw-silver/40">Reviewed by {request.reviewedBy} {formatDate(request.reviewedAt)}</p>
               )}
             </div>
-            {request.status === "pending" && (
+            {canReview && request.status === "pending" && (
               <div className="flex gap-2">
                 <AdminButton tone="teal" onClick={() => void review(request.id, "approved")}>Approve</AdminButton>
                 <AdminButton tone="danger" onClick={() => void review(request.id, "rejected")}>Reject</AdminButton>

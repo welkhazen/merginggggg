@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Ban, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
-import { fetchStats, moderateUser, type ModerationAction } from "@/lib/adminApi";
+import { fetchStats, fetchUsers, moderateUser, type ManagedUser, type ModerationAction } from "@/lib/adminApi";
 import { AdminButton, EmptyState, Field, Panel, useAsyncData } from "../ui";
 
 const TIMEOUTS = [
@@ -69,6 +69,40 @@ function QuickModerate() {
   const [username, setUsername] = useState("");
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState<string | null>(null);
+  const [matches, setMatches] = useState<ManagedUser[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const query = username.trim();
+    if (query.length < 1) {
+      setMatches([]);
+      setSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearching(true);
+    const timeoutId = window.setTimeout(() => {
+      fetchUsers({ q: query, limit: 8, status: "all" })
+        .then((users) => {
+          if (cancelled) return;
+          setMatches(users);
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          captureAdminException(error, { action: "admin_user_lookup", query });
+          setMatches([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [username]);
 
   async function run(action: ModerationAction, minutes?: number) {
     const target = username.trim();
@@ -90,7 +124,31 @@ function QuickModerate() {
     <Panel title="Moderate a user" hint="Warn, time out, ban, or unban by username.">
       <div className="space-y-3">
         <div className="grid gap-2 sm:grid-cols-2">
-          <Field value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" />
+          <div className="relative">
+            <Field value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" autoComplete="off" />
+            {(searching || matches.length > 0) && (
+              <div className="absolute left-0 right-0 top-full z-10 mt-2 overflow-hidden rounded-xl border border-raw-border/30 bg-raw-black/95 shadow-2xl">
+                {searching ? (
+                  <p className="px-3 py-2 text-xs text-raw-silver/45">Searching users...</p>
+                ) : (
+                  matches.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => {
+                        setUsername(user.username);
+                        setMatches([]);
+                      }}
+                      className="flex w-full items-center justify-between gap-3 border-b border-raw-border/15 px-3 py-2 text-left text-sm text-raw-text transition-colors last:border-b-0 hover:bg-raw-gold/10"
+                    >
+                      <span>@{user.username}</span>
+                      <span className="text-[11px] uppercase tracking-wide text-raw-silver/40">{user.status}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <Field value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Reason (optional)" />
         </div>
         <div className="flex flex-wrap gap-2">

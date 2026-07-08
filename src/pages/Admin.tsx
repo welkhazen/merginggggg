@@ -55,7 +55,7 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard; minT
   { id: "reports", label: "Reports", icon: Flag, minTier: "moderator" },
   { id: "flags", label: "Flagged content", icon: TriangleAlert, minTier: "moderator" },
   { id: "users", label: "Users & appeals", icon: Users, minTier: "admin" },
-  { id: "requests", label: "Community requests", icon: Inbox, minTier: "admin" },
+  { id: "requests", label: "Community requests", icon: Inbox, minTier: "moderator" },
   { id: "commerce", label: "Donations & tokens", icon: Coins, minTier: "admin" },
   { id: "words", label: "Word filters", icon: ShieldBan, minTier: "admin" },
   { id: "invites", label: "Invites", icon: Ticket, minTier: "admin" },
@@ -215,7 +215,7 @@ export default function Admin() {
             {activeTab?.id === "reports" && <ReportsTab />}
             {activeTab?.id === "flags" && <FlagsTab />}
             {activeTab?.id === "users" && <UsersTab />}
-            {activeTab?.id === "requests" && <RequestsTab />}
+            {activeTab?.id === "requests" && <RequestsTab currentTier={user.tier} />}
             {activeTab?.id === "commerce" && <CommerceTab />}
             {activeTab?.id === "words" && <WordsTab />}
             {activeTab?.id === "invites" && <InvitesTab currentUsername={user.username} />}
