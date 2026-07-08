@@ -190,6 +190,7 @@ export type TokenRequest = {
   id: string;
   userId: string | null;
   username: string | null;
+  tokens: number | null;
   priceUsd: number | null;
   reasons: string[];
   note: string | null;

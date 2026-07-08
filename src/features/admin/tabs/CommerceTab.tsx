@@ -82,6 +82,7 @@ function DonationsPanel() {
 
 function TokenRequestsPanel() {
   const { data: requests, loading, reload } = useAsyncData(() => fetchTokenRequests("all"));
+  const canReview = (status: string) => status === "pending" || status === "new";
 
   async function review(id: string, status: "approved" | "rejected") {
     try {
@@ -115,11 +116,12 @@ function TokenRequestsPanel() {
                 <Tag tone={statusTone(request.status)}>{request.status}</Tag>
                 {typeof request.priceUsd === "number" && <Tag tone="gold">${request.priceUsd}</Tag>}
               </p>
+              {typeof request.tokens === "number" && <p className="mt-0.5 text-xs text-raw-silver/60">{request.tokens} tokens</p>}
               {request.reasons.length > 0 && <p className="mt-0.5 text-xs text-raw-silver/60">{request.reasons.join(", ")}</p>}
               {request.note && <p className="mt-0.5 text-xs text-raw-silver/60">{request.note}</p>}
               <p className="mt-1 text-[10px] text-raw-silver/35">{formatDate(request.createdAt)}</p>
             </div>
-            {request.status === "pending" && (
+            {canReview(request.status) && (
               <div className="flex gap-2">
                 <AdminButton tone="teal" onClick={() => void review(request.id, "approved")}>Approve</AdminButton>
                 <AdminButton tone="danger" onClick={() => void review(request.id, "rejected")}>Reject</AdminButton>
