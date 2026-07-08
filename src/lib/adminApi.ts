@@ -41,6 +41,7 @@ export type DashboardStats = {
   pendingCommunityRequests: number;
   pendingDonations: number;
   pendingTokenRequests: number;
+  pendingWaitlist: number;
   pendingAppeals: number;
   openErrors: number;
   totalCommunities: number;
@@ -224,6 +225,17 @@ export type InviteRedemption = {
   redeemedBy: string | null;
   redeemedUsername: string | null;
   createdAt: string;
+};
+
+export type WaitlistRequestStatus = "pending" | "contacted" | "sent_code" | "closed";
+
+export type WaitlistRequest = {
+  id: string;
+  contact: string;
+  note: string;
+  source: string;
+  submittedAt: string;
+  status: WaitlistRequestStatus;
 };
 
 export type StaffMember = {
@@ -605,6 +617,20 @@ export async function grantInviteCodes(username: string, count: number): Promise
 export async function fetchInviteRedemptions(): Promise<InviteRedemption[]> {
   const body = await jsonRequest<{ redemptions: InviteRedemption[] }>("/api/admin/invite-redemptions");
   return body.redemptions;
+}
+
+export async function fetchWaitlistRequests(
+  status: WaitlistRequestStatus | "all" = "pending",
+): Promise<WaitlistRequest[]> {
+  const body = await jsonRequest<{ requests: WaitlistRequest[] }>(`/api/admin/waitlist-requests?status=${status}`);
+  return body.requests;
+}
+
+export async function updateWaitlistRequest(id: string, status: WaitlistRequestStatus): Promise<void> {
+  await jsonRequest<{ ok: true }>(`/api/admin/waitlist-requests/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 // --- Staff ---

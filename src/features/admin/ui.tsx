@@ -92,7 +92,10 @@ export function statusTone(status: string | null | undefined): keyof typeof TAG_
     case "approved":
     case "resolved":
     case "reviewed":
+    case "sent_code":
       return "green";
+    case "contacted":
+      return "teal";
     case "banned":
     case "rejected":
     case "denied":

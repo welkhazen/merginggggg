@@ -16,7 +16,8 @@ waitlistRouter.post("/invite", async (req, res) => {
 
   await insertRow("invite_waitlist_requests", {
     contact: parsed.data.contact,
-    note: parsed.data.note?.trim() || null,
+    // note is NOT NULL with default '' on the live table, so never insert null.
+    note: parsed.data.note?.trim() || "",
     source: parsed.data.source || "signup_modal",
   });
 
