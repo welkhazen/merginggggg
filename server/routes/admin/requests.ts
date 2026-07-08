@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import { writeAudit } from "../../lib/audit";
-import { selectRows, updateRows } from "../../lib/supabaseAdmin";
-import { adminSession } from "../../middleware/adminAuth";
+import { writeAudit } from "../../lib/audit.js";
+import { selectRows, updateRows } from "../../lib/supabaseAdmin.js";
+import { adminSession, requireTier } from "../../middleware/adminAuth.js";
 
 type CommunityRequestRow = {
   id: string;
@@ -30,7 +30,7 @@ const reviewSchema = z.object({
 
 export const requestsRouter = Router();
 
-requestsRouter.get("/community-requests", async (req, res) => {
+requestsRouter.get("/community-requests", requireTier("moderator"), async (req, res) => {
   const parsed = requestsQuerySchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: "invalid_query" });
 
@@ -62,7 +62,7 @@ requestsRouter.get("/community-requests", async (req, res) => {
   });
 });
 
-requestsRouter.patch("/community-requests/:id", async (req, res) => {
+requestsRouter.patch("/community-requests/:id", requireTier("admin"), async (req, res) => {
   const parsed = reviewSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
 
@@ -77,7 +77,7 @@ requestsRouter.patch("/community-requests/:id", async (req, res) => {
   await writeAudit(session, {
     action: "community_request_reviewed",
     targetType: "community_request",
-    targetId: req.params.id,
+    targetId: String(req.params.id),
     targetLabel: rows[0].community_name,
     details: { status: parsed.data.status },
   });

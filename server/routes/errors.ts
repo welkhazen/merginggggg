@@ -1,10 +1,10 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
-import { captureServerEvent, getPostHogDistinctId } from "../lib/analytics";
-import { sendCrashAlert } from "../lib/resend";
-import { insertRow } from "../lib/supabaseAdmin";
-import { getAdminSession } from "../middleware/adminAuth";
+import { captureServerEvent, getPostHogDistinctId } from "../lib/analytics.js";
+import { sendCrashAlert } from "../lib/resend.js";
+import { insertRow } from "../lib/supabaseAdmin.js";
+import { getAdminSession } from "../middleware/adminAuth.js";
 
 const reportSchema = z.object({
   source: z.enum(["client", "server", "supabase", "vercel", "external"]).default("client"),

@@ -1,4 +1,4 @@
-const CONTROL_CHARS_REGEX = /[\u0000-\u001F\u007F]/g;
+const CONTROL_CHARS_REGEX = new RegExp(String.raw`[\u0000-\u001F\u007F]`, "g");
 const MULTIPLE_SPACES_REGEX = /\s+/g;
 const ALLOWED_USERNAME_CHARS_REGEX = /[^a-zA-Z0-9._-]/g;
 

@@ -146,8 +146,8 @@ function BannedWordsPanel() {
               <div>
                 <p className="flex flex-wrap items-center gap-2 text-sm text-raw-text">
                   {entry.word}
-                  {entry.action && <Tag tone={entry.action === "block" ? "red" : "gold"}>{entry.action}</Tag>}
-                  {entry.category && <Tag tone="teal">{entry.category}</Tag>}
+                  {entry.action && <Tag tone={entry.action.toLowerCase() === "block" ? "red" : "gold"}>{entry.action.toLowerCase()}</Tag>}
+                  {entry.category && <Tag tone="teal">{entry.category.toLowerCase()}</Tag>}
                 </p>
                 <p className="text-[10px] text-raw-silver/35">
                   Added {entry.addedBy ? `by ${entry.addedBy} ` : ""}{formatDate(entry.createdAt)}

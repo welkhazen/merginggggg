@@ -27,3 +27,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Generated server bundle for the Vercel function (see build:api)
+api/_server/

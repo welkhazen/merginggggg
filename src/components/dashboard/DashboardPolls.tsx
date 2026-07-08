@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Poll } from "@/store/useRawStore";
+import { submitTokenRequest } from "@/lib/tokenRequests";
 import {
   BarChart3,
   Check,
   ChevronLeft,
+  CircleX,
   ChevronRight,
   MessageCircle,
   SendHorizontal,
@@ -16,6 +18,19 @@ interface PollHistoryComment {
   content: string;
   createdAt: string;
 }
+
+type TokenPackage = {
+  id: string;
+  label: string;
+  tokens: number;
+  priceUsd: number;
+};
+
+const TOKEN_PACKAGES: TokenPackage[] = [
+  { id: "starter", label: "50 tokens - $5.00 (Starter)", tokens: 50, priceUsd: 5 },
+  { id: "plus", label: "120 tokens - $10.00 (Plus)", tokens: 120, priceUsd: 10 },
+  { id: "boost", label: "250 tokens - $20.00 (Boost)", tokens: 250, priceUsd: 20 },
+];
 
 interface DashboardPollsProps {
   polls: Poll[];
@@ -46,6 +61,11 @@ export function DashboardPolls({
   const [historyComments, setHistoryComments] = useState<Record<string, PollHistoryComment[]>>({});
   const [commentDraft, setCommentDraft] = useState("");
   const [currentPollIndex, setCurrentPollIndex] = useState(0);
+  const [tokenModalOpen, setTokenModalOpen] = useState(false);
+  const [selectedPackageId, setSelectedPackageId] = useState<string>(TOKEN_PACKAGES[0].id);
+  const [tokenRequestPending, setTokenRequestPending] = useState(false);
+  const [tokenRequestMessage, setTokenRequestMessage] = useState<string | null>(null);
+  const [tokenRequestContext, setTokenRequestContext] = useState<string>("premium insight");
   const pointerStartXRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -155,6 +175,7 @@ export function DashboardPolls({
   ];
 
   const unlockedReports = insightsProgress.filter((item) => item.unlocked).length;
+  const selectedTokenPackage = TOKEN_PACKAGES.find((item) => item.id === selectedPackageId) ?? TOKEN_PACKAGES[0];
 
   const handleVote = (pollId: string, optionId: string) => {
     if (isDailyPollLimitReached) {
@@ -237,6 +258,26 @@ export function DashboardPolls({
 
     setCommentDraft("");
   };
+
+  async function requestTokens() {
+    setTokenRequestPending(true);
+    setTokenRequestMessage(null);
+    try {
+      await submitTokenRequest({
+        userId,
+        username,
+        tokens: selectedTokenPackage.tokens,
+        priceUsd: selectedTokenPackage.priceUsd,
+        reasons: [tokenRequestContext, "insight_unlock"],
+        note: `Requested from dashboard insights for ${tokenRequestContext}.`,
+      });
+      setTokenRequestMessage("Request sent. The admin team can now review it.");
+    } catch (error) {
+      setTokenRequestMessage(error instanceof Error ? error.message : "Could not send request.");
+    } finally {
+      setTokenRequestPending(false);
+    }
+  }
 
   if (!currentPoll) {
     return (
@@ -491,14 +532,24 @@ export function DashboardPolls({
               )}
 
               <button
-                disabled={!item.unlocked}
+                type="button"
+                disabled={!item.unlocked && !/\$\d+/.test(item.lockedAction)}
+                onClick={() => {
+                  if (item.unlocked) return;
+                  setTokenRequestContext(item.name);
+                  setSelectedPackageId(TOKEN_PACKAGES[0].id);
+                  setTokenRequestMessage(null);
+                  setTokenModalOpen(true);
+                }}
                 className={`mt-4 w-full rounded-xl border px-3 py-2 text-xs transition ${
                   item.unlocked
                     ? "border-emerald-400/35 bg-emerald-500/12 text-emerald-100 hover:bg-emerald-500/20"
-                    : "cursor-not-allowed border-raw-border/40 bg-raw-black/35 text-raw-silver/45"
+                    : /\$\d+/.test(item.lockedAction)
+                      ? "border-lime-400/35 bg-lime-400/10 text-lime-200 hover:bg-lime-400/15"
+                      : "cursor-not-allowed border-raw-border/40 bg-raw-black/35 text-raw-silver/45"
                 }`}
               >
-                {item.unlocked ? "View Report" : item.lockedAction}
+                {item.unlocked ? "View Report" : /\$\d+/.test(item.lockedAction) ? "Request tokens" : item.lockedAction}
               </button>
             </article>
           ))}
@@ -506,6 +557,69 @@ export function DashboardPolls({
 
         <p className="text-center text-xs text-raw-silver/45">More insight models coming soon</p>
       </section>
+
+      {tokenModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[2rem] border border-lime-200/60 bg-[#f7f4ed] p-6 text-[#2b2b2b] shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-display text-2xl">Not enough tokens</h3>
+                <p className="mt-3 rounded-2xl border border-lime-300/50 bg-[#f8f6ef] px-4 py-3 text-sm text-[#6d6d61]">
+                  You don't have enough tokens for this purchase. Pick a package below to request more.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTokenModalOpen(false)}
+                className="rounded-full border border-[#ddd8cb] p-2 text-[#9a978f] transition hover:text-[#4a4a42]"
+                aria-label="Close token request"
+              >
+                <CircleX className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-[#b3b0a7]">Choose a package</p>
+              <select
+                value={selectedPackageId}
+                onChange={(event) => setSelectedPackageId(event.target.value)}
+                className="mt-2 min-h-11 w-full rounded-2xl border border-[#e5e1d7] bg-white px-4 text-sm text-[#2b2b2b] outline-none"
+              >
+                {TOKEN_PACKAGES.map((tokenPackage) => (
+                  <option key={tokenPackage.id} value={tokenPackage.id}>
+                    {tokenPackage.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-lime-300/45 bg-[#fbfaf4] px-4 py-4">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-[#b3b0a7]">Order summary</p>
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="font-display text-2xl text-[#2b2b2b]">{selectedTokenPackage.tokens} tokens</span>
+                </div>
+                <span className="text-3xl text-lime-500">${selectedTokenPackage.priceUsd.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {tokenRequestMessage && (
+              <p className={`mt-4 text-sm ${tokenRequestMessage.startsWith("Request sent") ? "text-emerald-600" : "text-red-500"}`}>
+                {tokenRequestMessage}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void requestTokens()}
+              disabled={tokenRequestPending}
+              className="mt-5 min-h-11 w-full rounded-2xl bg-lime-400 px-4 text-sm font-semibold text-[#182000] transition hover:bg-lime-300 disabled:opacity-60"
+            >
+              {tokenRequestPending ? "Sending request..." : "Request tokens"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

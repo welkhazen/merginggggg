@@ -1,6 +1,6 @@
 import type { Request } from "express";
 import { PostHog } from "posthog-node";
-import { env } from "../config/env";
+import { env } from "../config/env.js";
 
 const posthog = env.POSTHOG_PROJECT_API_KEY
   ? new PostHog(env.POSTHOG_PROJECT_API_KEY, {

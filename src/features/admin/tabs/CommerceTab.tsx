@@ -118,6 +118,7 @@ function TokenRequestsPanel() {
 }
 
 function requestedTokenAmount(request: TokenRequest): number {
+  if (typeof request.tokens === "number" && request.tokens > 0) return request.tokens;
   const text = [...request.reasons, request.note ?? ""].join(" ");
   const match = text.match(/\b(\d+)\s+tokens?\b/i);
   return match ? Number(match[1]) : 1;
@@ -132,6 +133,7 @@ function TokenRequestRow({
 }) {
   const [tokenAmount, setTokenAmount] = useState(() => requestedTokenAmount(request));
   const validAmount = Number.isInteger(tokenAmount) && tokenAmount > 0;
+  const canReview = request.status === "pending" || request.status === "new";
 
   return (
     <Row>
@@ -141,11 +143,12 @@ function TokenRequestRow({
           <Tag tone={statusTone(request.status)}>{request.status}</Tag>
           {typeof request.priceUsd === "number" && <Tag tone="gold">${request.priceUsd}</Tag>}
         </p>
+        {typeof request.tokens === "number" && <p className="mt-0.5 text-xs text-raw-silver/60">{request.tokens} tokens</p>}
         {request.reasons.length > 0 && <p className="mt-0.5 text-xs text-raw-silver/60">{request.reasons.join(", ")}</p>}
         {request.note && <p className="mt-0.5 text-xs text-raw-silver/60">{request.note}</p>}
         <p className="mt-1 text-[10px] text-raw-silver/35">{formatDate(request.createdAt)}</p>
       </div>
-      {request.status === "pending" && (
+      {canReview && (
         <div className="flex gap-2">
           <input
             aria-label={`Token amount for ${request.username ?? "request"}`}

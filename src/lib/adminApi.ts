@@ -73,6 +73,11 @@ export type CommunityMessage = {
   replyToText: string | null;
 };
 
+export type SendCommunityMessageInput = {
+  text: string;
+  replyToMessageId?: string;
+};
+
 export type CommunityMember = {
   userId: string;
   username: string | null;
@@ -185,6 +190,7 @@ export type TokenRequest = {
   id: string;
   userId: string | null;
   username: string | null;
+  tokens: number | null;
   priceUsd: number | null;
   reasons: string[];
   note: string | null;
@@ -380,6 +386,17 @@ export async function fetchCommunityMessages(
   return body.messages;
 }
 
+export async function sendCommunityMessage(id: string, input: SendCommunityMessageInput): Promise<CommunityMessage> {
+  const body = await jsonRequest<{ message: CommunityMessage }>(
+    `/api/admin/communities/${encodeURIComponent(id)}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return body.message;
+}
+
 export async function fetchCommunityMembers(id: string): Promise<CommunityMember[]> {
   const body = await jsonRequest<{ members: CommunityMember[] }>(
     `/api/admin/communities/${encodeURIComponent(id)}/members`,
@@ -432,6 +449,12 @@ export async function fetchUsers(options: { q?: string; status?: string; limit?:
   return body.users;
 }
 
+export async function searchUsers(q: string, limit: number = 8): Promise<ManagedUser[]> {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  const body = await jsonRequest<{ users: ManagedUser[] }>(`/api/admin/users/search?${params}`);
+  return body.users;
+}
+
 export async function fetchUserDetail(id: string): Promise<UserDetail> {
   return jsonRequest<UserDetail>(`/api/admin/users/${encodeURIComponent(id)}`);
 }
@@ -445,6 +468,12 @@ export async function moderateUser(
   await jsonRequest<{ ok: true }>("/api/admin/moderate-user", {
     method: "POST",
     body: JSON.stringify({ username, action, minutes, reason }),
+  });
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await jsonRequest<{ ok: true }>(`/api/admin/users/${encodeURIComponent(id)}`, {
+    method: "DELETE",
   });
 }
 
@@ -505,11 +534,14 @@ export async function fetchTokenRequests(status: string = "all"): Promise<TokenR
 export async function updateTokenRequest(
   id: string,
   status: "pending" | "approved" | "rejected",
-  tokenAmount?: number,
+  tokens?: number,
 ): Promise<void> {
+  const payload: { status: "pending" | "approved" | "rejected"; tokens?: number } = { status };
+  if (tokens !== undefined) payload.tokens = tokens;
+
   await jsonRequest<{ ok: true }>(`/api/admin/token-requests/${encodeURIComponent(id)}`, {
     method: "PATCH",
-    body: JSON.stringify({ status, tokenAmount }),
+    body: JSON.stringify(payload),
   });
 }
 

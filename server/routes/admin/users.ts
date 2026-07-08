@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics";
-import { writeAudit } from "../../lib/audit";
-import { resolveTier, TIER_RANK } from "../../lib/roles";
-import { insertRow, selectRows, updateRows } from "../../lib/supabaseAdmin";
-import { adminSession, requireTier } from "../../middleware/adminAuth";
+import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics.js";
+import { writeAudit } from "../../lib/audit.js";
+import { resolveTier, TIER_RANK } from "../../lib/roles.js";
+import { deleteRows, insertRow, selectRows, updateRows } from "../../lib/supabaseAdmin.js";
+import { adminSession, requireTier } from "../../middleware/adminAuth.js";
 
 type DbUser = {
   id: string;
@@ -31,6 +31,11 @@ const usersQuerySchema = z.object({
   status: z.enum(["active", "warned", "banned", "all"]).default("all"),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).default(0),
+});
+
+const userSearchSchema = z.object({
+  q: z.string().trim().min(1).max(48),
+  limit: z.coerce.number().int().min(1).max(20).default(8),
 });
 
 const moderateSchema = z.object({
@@ -78,6 +83,19 @@ async function findUserByUsername(username: string) {
 }
 
 export const usersRouter = Router();
+
+usersRouter.get("/users/search", requireTier("moderator"), async (req, res) => {
+  const parsed = userSearchSchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_query" });
+
+  const rows = await selectRows<DbUser>("users", {
+    select: USER_SELECT,
+    username: `ilike.*${parsed.data.q.replace(/[%_*,()\\]/g, "")}*`,
+    order: "created_at.desc",
+    limit: parsed.data.limit,
+  });
+  return res.status(200).json({ users: rows.map(mapUser) });
+});
 
 usersRouter.get("/users", requireTier("admin"), async (req, res) => {
   const parsed = usersQuerySchema.safeParse(req.query);
@@ -149,6 +167,35 @@ usersRouter.get("/users/:id", requireTier("admin"), async (req, res) => {
       createdAt: appeal.created_at,
     })),
   });
+});
+
+usersRouter.delete("/users/:id", requireTier("admin"), async (req, res) => {
+  const session = adminSession(res);
+  const rows = await selectRows<DbUser>("users", {
+    select: USER_SELECT,
+    id: `eq.${req.params.id}`,
+    limit: 1,
+  });
+  const target = rows[0];
+  if (!target) return res.status(404).json({ error: "user_not_found" });
+  if (target.id === session.userId) return res.status(400).json({ error: "cannot_delete_self" });
+
+  const targetTier = resolveTier(target);
+  if (targetTier && TIER_RANK[targetTier] >= TIER_RANK[session.tier]) {
+    return res.status(403).json({ error: "cannot_delete_staff" });
+  }
+
+  await deleteRows("users", { id: `eq.${target.id}` });
+  await writeAudit(session, {
+    action: "user_deleted",
+    targetType: "user",
+    targetId: target.id,
+    targetLabel: target.username,
+  });
+  captureServerEvent(req, "admin_user_deleted_server", getPostHogDistinctId(req, session.userId), {
+    target_role: target.role,
+  });
+  return res.status(200).json({ ok: true });
 });
 
 // Kept at its original path so existing clients keep working.

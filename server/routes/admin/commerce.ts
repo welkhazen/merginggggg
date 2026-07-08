@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
-import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics";
-import { writeAudit } from "../../lib/audit";
-import { deleteRows, rpc, selectRows, SupabaseAdminError, updateRows } from "../../lib/supabaseAdmin";
-import { adminSession } from "../../middleware/adminAuth";
+import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics.js";
+import { writeAudit } from "../../lib/audit.js";
+import { deleteRows, rpc, selectRows, SupabaseAdminError, updateRows } from "../../lib/supabaseAdmin.js";
+import { adminSession } from "../../middleware/adminAuth.js";
 
 type DonationInterestRow = {
   id: string;
@@ -18,12 +18,15 @@ type TokenRequestRow = {
   id: string;
   user_id: string | null;
   username: string | null;
+  tokens: number | null;
   price_usd: number | null;
   reasons: string[] | null;
   note: string | null;
   status: string;
   created_at: string;
 };
+
+type TokenRequestRowWithoutTokens = Omit<TokenRequestRow, "tokens">;
 
 const idSchema = z.object({ id: z.string().uuid() });
 
@@ -34,7 +37,8 @@ const donationStatusSchema = z.object({
 
 const tokenStatusSchema = z.object({
   status: z.enum(["pending", "approved", "rejected"]),
-  tokenAmount: z.number().int().positive().optional(),
+  tokens: z.number().int().positive().max(100000).optional(),
+  tokenAmount: z.number().int().positive().max(100000).optional(),
 });
 
 function parseRequestedTokens(row: Pick<TokenRequestRow, "reasons" | "note">): number | null {
@@ -68,6 +72,20 @@ function mapDonation(row: DonationInterestRow) {
     phone: row.phone,
     submittedAt: row.submitted_at,
     status: row.status,
+  };
+}
+
+function mapTokenRequest(row: TokenRequestRow | TokenRequestRowWithoutTokens) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    username: row.username,
+    tokens: "tokens" in row ? row.tokens : null,
+    priceUsd: row.price_usd,
+    reasons: row.reasons ?? [],
+    note: row.note,
+    status: row.status,
+    createdAt: row.created_at,
   };
 }
 
@@ -118,30 +136,35 @@ commerceRouter.delete("/donation-interests", async (req, res) => {
 commerceRouter.get("/token-requests", async (req, res) => {
   const status = typeof req.query.status === "string" ? req.query.status : "all";
   const params: Record<string, string | number> = {
-    select: "id,user_id,username,price_usd,reasons,note,status,created_at",
+    select: "id,user_id,username,tokens,price_usd,reasons,note,status,created_at",
     order: "created_at.desc",
     limit: 100,
   };
   if (status !== "all") params.status = `eq.${status}`;
 
-  const rows = await selectRows<TokenRequestRow>("token_requests", params);
+  let rows: Array<TokenRequestRow | TokenRequestRowWithoutTokens>;
+  try {
+    rows = await selectRows<TokenRequestRow>("token_requests", params);
+  } catch (error) {
+    if (!(error instanceof SupabaseAdminError) || !error.message.includes("token_requests.tokens")) throw error;
+    rows = await selectRows<TokenRequestRowWithoutTokens>("token_requests", {
+      ...params,
+      select: "id,user_id,username,price_usd,reasons,note,status,created_at",
+    });
+  }
+
   return res.status(200).json({
-    tokenRequests: rows.map((row) => ({
-      id: row.id,
-      userId: row.user_id,
-      username: row.username,
-      priceUsd: row.price_usd,
-      reasons: row.reasons ?? [],
-      note: row.note,
-      status: row.status,
-      createdAt: row.created_at,
-    })),
+    tokenRequests: rows.map(mapTokenRequest),
   });
 });
 
 commerceRouter.patch("/token-requests/:id", async (req, res) => {
   const parsed = tokenStatusSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
+  const requestedTokenAmount = parsed.data.tokens ?? parsed.data.tokenAmount;
+  if (requestedTokenAmount !== undefined && parsed.data.status !== "approved") {
+    return res.status(400).json({ error: "tokens_only_allowed_on_approval" });
+  }
 
   const requestRows = await selectRows<TokenRequestRow>("token_requests", {
     select: "id,user_id,username,price_usd,reasons,note,status,created_at",
@@ -154,7 +177,7 @@ commerceRouter.patch("/token-requests/:id", async (req, res) => {
   let rows: TokenRequestRow[];
   let creditedTokens: number | undefined;
   if (parsed.data.status === "approved") {
-    const tokenAmount = parsed.data.tokenAmount ?? parseRequestedTokens(requestRow);
+    const tokenAmount = requestedTokenAmount ?? parseRequestedTokens(requestRow);
     if (!tokenAmount) return res.status(400).json({ error: "token_amount_required" });
 
     let approvedRows: Array<{ id: string; username: string | null; credited_tokens: number }>;
