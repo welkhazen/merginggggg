@@ -18,6 +18,7 @@ const STAT_CARDS: Array<{ key: string; label: string; alert?: boolean }> = [
   { key: "pendingAppeals", label: "Pending appeals", alert: true },
   { key: "pendingDonations", label: "Pending donations" },
   { key: "pendingTokenRequests", label: "Pending token requests" },
+  { key: "pendingWaitlist", label: "Waitlist signups", alert: true },
   { key: "openErrors", label: "Open errors", alert: true },
   { key: "totalUsers", label: "Total users" },
   { key: "newUsers7d", label: "New users (7d)" },

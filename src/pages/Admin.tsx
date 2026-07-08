@@ -58,7 +58,7 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof LayoutDashboard; minT
   { id: "requests", label: "Community requests", icon: Inbox, minTier: "moderator" },
   { id: "commerce", label: "Donations & tokens", icon: Coins, minTier: "admin" },
   { id: "words", label: "Word filters", icon: ShieldBan, minTier: "admin" },
-  { id: "invites", label: "Invites", icon: Ticket, minTier: "admin" },
+  { id: "invites", label: "Invites & waitlist", icon: Ticket, minTier: "admin" },
   { id: "analytics", label: "Analytics", icon: ChartLine, minTier: "admin" },
   { id: "staff", label: "Staff", icon: UserCog, minTier: "owner" },
   { id: "audit", label: "Audit log", icon: ScrollText, minTier: "owner" },

@@ -2,15 +2,114 @@ import { useState } from "react";
 import { RefreshCw, Sparkles, Ticket } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
-import { fetchInviteRedemptions, grantInviteCodes } from "@/lib/adminApi";
-import { AdminButton, EmptyState, Field, formatDate, Panel, Row, useAsyncData } from "../ui";
+import {
+  fetchInviteRedemptions,
+  fetchWaitlistRequests,
+  grantInviteCodes,
+  updateWaitlistRequest,
+  type WaitlistRequestStatus,
+} from "@/lib/adminApi";
+import { AdminButton, EmptyState, Field, formatDate, Panel, Row, SelectField, statusTone, Tag, useAsyncData } from "../ui";
 
 export function InvitesTab({ currentUsername }: { currentUsername: string }) {
   return (
     <>
+      <WaitlistPanel />
       <GrantInvitesPanel currentUsername={currentUsername} />
       <RedemptionsPanel />
     </>
+  );
+}
+
+const WAITLIST_STATUS_LABELS: Record<WaitlistRequestStatus, string> = {
+  pending: "Pending",
+  contacted: "Contacted",
+  sent_code: "Code sent",
+  closed: "Closed",
+};
+
+function WaitlistPanel() {
+  const [status, setStatus] = useState<WaitlistRequestStatus | "all">("pending");
+  const { data: requests, loading, reload } = useAsyncData(() => fetchWaitlistRequests(status), [status]);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  async function setRequestStatus(id: string, next: WaitlistRequestStatus) {
+    setSavingId(id);
+    try {
+      await updateWaitlistRequest(id, next);
+      captureAdminEvent("admin_waitlist_request_updated", { status: next });
+      toast({ title: `Request marked ${WAITLIST_STATUS_LABELS[next].toLowerCase()}` });
+      reload();
+    } catch (error) {
+      captureAdminException(error, { action: "admin_waitlist_request_update" });
+      toast({ title: "Could not update request" });
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  return (
+    <Panel
+      title="Signup waitlist"
+      hint="Invite requests from the signup modal. Contact the person, grant a code below, then mark it sent."
+      actions={
+        <div className="flex gap-2">
+          <SelectField value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>
+            <option value="pending">Pending</option>
+            <option value="contacted">Contacted</option>
+            <option value="sent_code">Code sent</option>
+            <option value="closed">Closed</option>
+            <option value="all">All</option>
+          </SelectField>
+          <AdminButton tone="outline" disabled={loading} onClick={reload} aria-label="Refresh waitlist">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </AdminButton>
+        </div>
+      }
+    >
+      {requests && requests.length === 0 && <EmptyState>No waitlist requests in this view.</EmptyState>}
+      <div className="space-y-2">
+        {requests?.map((request) => {
+          const busy = savingId !== null;
+          return (
+            <Row key={request.id}>
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-raw-text">
+                  <span className="break-all font-mono">{request.contact}</span>
+                  <Tag tone={statusTone(request.status)}>{WAITLIST_STATUS_LABELS[request.status] ?? request.status}</Tag>
+                </p>
+                <p className="mt-0.5 text-xs text-raw-silver/50">
+                  via {request.source.replaceAll("_", " ")} · {formatDate(request.submittedAt)}
+                </p>
+                {request.note && <p className="mt-1 text-xs text-raw-silver/60">Note: {request.note}</p>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {request.status === "pending" && (
+                  <AdminButton tone="teal" disabled={busy} onClick={() => void setRequestStatus(request.id, "contacted")}>
+                    Mark contacted
+                  </AdminButton>
+                )}
+                {(request.status === "pending" || request.status === "contacted") && (
+                  <AdminButton disabled={busy} onClick={() => void setRequestStatus(request.id, "sent_code")}>
+                    <Ticket className="h-4 w-4" /> Code sent
+                  </AdminButton>
+                )}
+                {request.status !== "closed" && (
+                  <AdminButton tone="outline" disabled={busy} onClick={() => void setRequestStatus(request.id, "closed")}>
+                    Close
+                  </AdminButton>
+                )}
+                {request.status === "closed" && (
+                  <AdminButton tone="outline" disabled={busy} onClick={() => void setRequestStatus(request.id, "pending")}>
+                    Reopen
+                  </AdminButton>
+                )}
+              </div>
+            </Row>
+          );
+        })}
+      </div>
+    </Panel>
   );
 }
 
