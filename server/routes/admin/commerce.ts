@@ -193,6 +193,10 @@ commerceRouter.patch("/token-requests/:id", async (req, res) => {
     const tokenAmount = requestedTokenAmount ?? parseRequestedTokens(requestRow);
     if (!tokenAmount) return res.status(400).json({ error: "token_amount_required" });
 
+    if (requestRow.status === "new") {
+      await updateRows<TokenRequestRow>("token_requests", { id: `eq.${req.params.id}` }, { status: "pending" });
+    }
+
     let approvedRows: Array<{ id: string; username: string | null; credited_tokens: number }>;
     try {
       approvedRows = await rpc<Array<{ id: string; username: string | null; credited_tokens: number }>>(
