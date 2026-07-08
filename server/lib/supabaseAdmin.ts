@@ -1,4 +1,4 @@
-import { env } from "../config/env";
+import { env, isSupabaseConfigured } from "../config/env";
 
 type QueryValue = string | number | boolean | null | undefined;
 
@@ -11,7 +11,14 @@ export class SupabaseAdminError extends Error {
   }
 }
 
+function assertSupabaseConfigured() {
+  if (!isSupabaseConfigured) {
+    throw new SupabaseAdminError("Supabase is not configured.", 503);
+  }
+}
+
 function headers(extra: Record<string, string> = {}) {
+  assertSupabaseConfigured();
   return {
     apikey: env.SUPABASE_SERVICE_ROLE_KEY,
     authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
