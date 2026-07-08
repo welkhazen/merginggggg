@@ -8,6 +8,7 @@ import {
   fetchTokenRequests,
   updateDonationInterestStatus,
   updateTokenRequest,
+  type TokenRequest,
 } from "@/lib/adminApi";
 import { AdminButton, EmptyState, formatDate, Panel, Row, statusTone, Tag, useAsyncData } from "../ui";
 
@@ -83,16 +84,11 @@ function DonationsPanel() {
 
 function TokenRequestsPanel() {
   const { data: requests, loading, reload } = useAsyncData(() => fetchTokenRequests("all"));
-  const [tokenAmounts, setTokenAmounts] = useState<Record<string, string>>({});
-  const canReview = (status: string) => status === "pending" || status === "new";
 
-  async function review(id: string, status: "approved" | "rejected") {
-    const customTokens = Number.parseInt(tokenAmounts[id] ?? "", 10);
-    const tokens = status === "approved" && Number.isFinite(customTokens) && customTokens > 0 ? customTokens : undefined;
-
+  async function review(id: string, status: "approved" | "rejected", tokenAmount?: number) {
     try {
-      await updateTokenRequest(id, status, tokens);
-      captureAdminEvent("admin_token_request_reviewed", { status, customTokens: tokens });
+      await updateTokenRequest(id, status, tokenAmount);
+      captureAdminEvent("admin_token_request_reviewed", { status, tokenAmount });
       toast({ title: `Token request ${status}` });
       reload();
     } catch (error) {
@@ -114,37 +110,61 @@ function TokenRequestsPanel() {
       {requests && requests.length === 0 && <EmptyState>No token requests yet.</EmptyState>}
       <div className="space-y-2">
         {requests?.map((request) => (
-          <Row key={request.id}>
-            <div className="min-w-0 flex-1">
-              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-raw-text">
-                @{request.username ?? "unknown"}
-                <Tag tone={statusTone(request.status)}>{request.status}</Tag>
-                {typeof request.priceUsd === "number" && <Tag tone="gold">${request.priceUsd}</Tag>}
-              </p>
-              {typeof request.tokens === "number" && <p className="mt-0.5 text-xs text-raw-silver/60">{request.tokens} tokens</p>}
-              {request.reasons.length > 0 && <p className="mt-0.5 text-xs text-raw-silver/60">{request.reasons.join(", ")}</p>}
-              {request.note && <p className="mt-0.5 text-xs text-raw-silver/60">{request.note}</p>}
-              <p className="mt-1 text-[10px] text-raw-silver/35">{formatDate(request.createdAt)}</p>
-            </div>
-            {canReview(request.status) && (
-              <div className="flex flex-wrap justify-end gap-2">
-                <input
-                  className="min-h-10 w-24 rounded-xl border border-raw-border/30 bg-raw-black/45 px-3 text-xs text-raw-text placeholder:text-raw-silver/25 focus:border-raw-gold/50 focus:outline-none"
-                  inputMode="numeric"
-                  min={1}
-                  max={100000}
-                  placeholder={request.tokens ? String(request.tokens) : "Tokens"}
-                  type="number"
-                  value={tokenAmounts[request.id] ?? ""}
-                  onChange={(event) => setTokenAmounts((current) => ({ ...current, [request.id]: event.target.value }))}
-                />
-                <AdminButton tone="teal" onClick={() => void review(request.id, "approved")}>Approve</AdminButton>
-                <AdminButton tone="danger" onClick={() => void review(request.id, "rejected")}>Reject</AdminButton>
-              </div>
-            )}
-          </Row>
+          <TokenRequestRow key={request.id} request={request} onReview={review} />
         ))}
       </div>
     </Panel>
+  );
+}
+
+function requestedTokenAmount(request: TokenRequest): number {
+  if (typeof request.tokens === "number" && request.tokens > 0) return request.tokens;
+  const text = [...request.reasons, request.note ?? ""].join(" ");
+  const match = text.match(/\b(\d+)\s+tokens?\b/i);
+  return match ? Number(match[1]) : 1;
+}
+
+function TokenRequestRow({
+  request,
+  onReview,
+}: {
+  request: TokenRequest;
+  onReview: (id: string, status: "approved" | "rejected", tokenAmount?: number) => Promise<void>;
+}) {
+  const [tokenAmount, setTokenAmount] = useState(() => requestedTokenAmount(request));
+  const validAmount = Number.isInteger(tokenAmount) && tokenAmount > 0;
+  const canReview = request.status === "pending" || request.status === "new";
+
+  return (
+    <Row>
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-raw-text">
+          @{request.username ?? "unknown"}
+          <Tag tone={statusTone(request.status)}>{request.status}</Tag>
+          {typeof request.priceUsd === "number" && <Tag tone="gold">${request.priceUsd}</Tag>}
+        </p>
+        {typeof request.tokens === "number" && <p className="mt-0.5 text-xs text-raw-silver/60">{request.tokens} tokens</p>}
+        {request.reasons.length > 0 && <p className="mt-0.5 text-xs text-raw-silver/60">{request.reasons.join(", ")}</p>}
+        {request.note && <p className="mt-0.5 text-xs text-raw-silver/60">{request.note}</p>}
+        <p className="mt-1 text-[10px] text-raw-silver/35">{formatDate(request.createdAt)}</p>
+      </div>
+      {canReview && (
+        <div className="flex gap-2">
+          <input
+            aria-label={`Token amount for ${request.username ?? "request"}`}
+            className="h-10 w-28 rounded-md border border-raw-line bg-raw-black px-3 text-sm font-semibold text-raw-text outline-none focus:border-raw-cyan"
+            min={1}
+            step={1}
+            type="number"
+            value={tokenAmount}
+            onChange={(event) => setTokenAmount(Number(event.target.value))}
+          />
+          <AdminButton tone="teal" disabled={!validAmount} onClick={() => void onReview(request.id, "approved", tokenAmount)}>
+            Approve
+          </AdminButton>
+          <AdminButton tone="danger" onClick={() => void onReview(request.id, "rejected")}>Reject</AdminButton>
+        </div>
+      )}
+    </Row>
   );
 }
