@@ -4,6 +4,7 @@ import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics.js
 import { writeAudit } from "../../lib/audit.js";
 import { deleteRows, rpc, selectRows, SupabaseAdminError, updateRows } from "../../lib/supabaseAdmin.js";
 import { adminSession } from "../../middleware/adminAuth.js";
+import { sendUserPush } from "../../lib/pushNotify.js";
 
 type DonationInterestRow = {
   id: string;
@@ -245,5 +246,18 @@ commerceRouter.patch("/token-requests/:id", async (req, res) => {
     targetLabel: rows[0].username ?? undefined,
     details: { status: parsed.data.status, creditedTokens },
   });
+
+  // Notify the requester of the outcome (best-effort push; the in-app bell in
+  // the user app reads the request status directly).
+  if (requestRow.user_id && (parsed.data.status === "approved" || parsed.data.status === "rejected")) {
+    const tokens = creditedTokens ?? parseRequestedTokens(requestRow) ?? undefined;
+    const amount = tokens ? `${tokens.toLocaleString()} tokens` : "tokens";
+    void sendUserPush(
+      parsed.data.status === "approved"
+        ? { userId: requestRow.user_id, title: "Token request approved", body: `Your request for ${amount} was approved and added to your balance.`, url: "/dashboard" }
+        : { userId: requestRow.user_id, title: "Token request declined", body: `Your request for ${amount} was declined.`, url: "/dashboard" },
+    );
+  }
+
   return res.status(200).json({ ok: true });
 });
