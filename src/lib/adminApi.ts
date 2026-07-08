@@ -531,10 +531,17 @@ export async function fetchTokenRequests(status: string = "all"): Promise<TokenR
   return body.tokenRequests;
 }
 
-export async function updateTokenRequest(id: string, status: "pending" | "approved" | "rejected"): Promise<void> {
+export async function updateTokenRequest(
+  id: string,
+  status: "pending" | "approved" | "rejected",
+  tokens?: number,
+): Promise<void> {
+  const payload: { status: "pending" | "approved" | "rejected"; tokens?: number } = { status };
+  if (tokens !== undefined) payload.tokens = tokens;
+
   await jsonRequest<{ ok: true }>(`/api/admin/token-requests/${encodeURIComponent(id)}`, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(payload),
   });
 }
 

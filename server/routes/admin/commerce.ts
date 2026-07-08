@@ -35,6 +35,7 @@ const donationStatusSchema = z.object({
 
 const tokenStatusSchema = z.object({
   status: z.enum(["pending", "approved", "rejected"]),
+  tokens: z.number().int().positive().max(100000).optional(),
 });
 
 function mapDonation(row: DonationInterestRow) {
@@ -120,11 +121,17 @@ commerceRouter.get("/token-requests", async (req, res) => {
 commerceRouter.patch("/token-requests/:id", async (req, res) => {
   const parsed = tokenStatusSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
+  if (parsed.data.tokens !== undefined && parsed.data.status !== "approved") {
+    return res.status(400).json({ error: "tokens_only_allowed_on_approval" });
+  }
+
+  const updates: { status: "pending" | "approved" | "rejected"; tokens?: number } = { status: parsed.data.status };
+  if (parsed.data.tokens !== undefined) updates.tokens = parsed.data.tokens;
 
   const rows = await updateRows<TokenRequestRow>(
     "token_requests",
     { id: `eq.${req.params.id}` },
-    { status: parsed.data.status },
+    updates,
   );
   if (rows.length === 0) return res.status(404).json({ error: "token_request_not_found" });
 
