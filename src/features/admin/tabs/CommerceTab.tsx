@@ -1,4 +1,5 @@
 import { RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
 import {
@@ -7,6 +8,7 @@ import {
   fetchTokenRequests,
   updateDonationInterestStatus,
   updateTokenRequest,
+  type TokenRequest,
 } from "@/lib/adminApi";
 import { AdminButton, EmptyState, formatDate, Panel, Row, statusTone, Tag, useAsyncData } from "../ui";
 
@@ -83,10 +85,10 @@ function DonationsPanel() {
 function TokenRequestsPanel() {
   const { data: requests, loading, reload } = useAsyncData(() => fetchTokenRequests("all"));
 
-  async function review(id: string, status: "approved" | "rejected") {
+  async function review(id: string, status: "approved" | "rejected", tokenAmount?: number) {
     try {
-      await updateTokenRequest(id, status);
-      captureAdminEvent("admin_token_request_reviewed", { status });
+      await updateTokenRequest(id, status, tokenAmount);
+      captureAdminEvent("admin_token_request_reviewed", { status, tokenAmount });
       toast({ title: `Token request ${status}` });
       reload();
     } catch (error) {
@@ -108,26 +110,58 @@ function TokenRequestsPanel() {
       {requests && requests.length === 0 && <EmptyState>No token requests yet.</EmptyState>}
       <div className="space-y-2">
         {requests?.map((request) => (
-          <Row key={request.id}>
-            <div className="min-w-0 flex-1">
-              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-raw-text">
-                @{request.username ?? "unknown"}
-                <Tag tone={statusTone(request.status)}>{request.status}</Tag>
-                {typeof request.priceUsd === "number" && <Tag tone="gold">${request.priceUsd}</Tag>}
-              </p>
-              {request.reasons.length > 0 && <p className="mt-0.5 text-xs text-raw-silver/60">{request.reasons.join(", ")}</p>}
-              {request.note && <p className="mt-0.5 text-xs text-raw-silver/60">{request.note}</p>}
-              <p className="mt-1 text-[10px] text-raw-silver/35">{formatDate(request.createdAt)}</p>
-            </div>
-            {request.status === "pending" && (
-              <div className="flex gap-2">
-                <AdminButton tone="teal" onClick={() => void review(request.id, "approved")}>Approve</AdminButton>
-                <AdminButton tone="danger" onClick={() => void review(request.id, "rejected")}>Reject</AdminButton>
-              </div>
-            )}
-          </Row>
+          <TokenRequestRow key={request.id} request={request} onReview={review} />
         ))}
       </div>
     </Panel>
+  );
+}
+
+function requestedTokenAmount(request: TokenRequest): number {
+  const text = [...request.reasons, request.note ?? ""].join(" ");
+  const match = text.match(/\b(\d+)\s+tokens?\b/i);
+  return match ? Number(match[1]) : 1;
+}
+
+function TokenRequestRow({
+  request,
+  onReview,
+}: {
+  request: TokenRequest;
+  onReview: (id: string, status: "approved" | "rejected", tokenAmount?: number) => Promise<void>;
+}) {
+  const [tokenAmount, setTokenAmount] = useState(() => requestedTokenAmount(request));
+  const validAmount = Number.isInteger(tokenAmount) && tokenAmount > 0;
+
+  return (
+    <Row>
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-raw-text">
+          @{request.username ?? "unknown"}
+          <Tag tone={statusTone(request.status)}>{request.status}</Tag>
+          {typeof request.priceUsd === "number" && <Tag tone="gold">${request.priceUsd}</Tag>}
+        </p>
+        {request.reasons.length > 0 && <p className="mt-0.5 text-xs text-raw-silver/60">{request.reasons.join(", ")}</p>}
+        {request.note && <p className="mt-0.5 text-xs text-raw-silver/60">{request.note}</p>}
+        <p className="mt-1 text-[10px] text-raw-silver/35">{formatDate(request.createdAt)}</p>
+      </div>
+      {request.status === "pending" && (
+        <div className="flex gap-2">
+          <input
+            aria-label={`Token amount for ${request.username ?? "request"}`}
+            className="h-10 w-28 rounded-md border border-raw-line bg-raw-black px-3 text-sm font-semibold text-raw-text outline-none focus:border-raw-cyan"
+            min={1}
+            step={1}
+            type="number"
+            value={tokenAmount}
+            onChange={(event) => setTokenAmount(Number(event.target.value))}
+          />
+          <AdminButton tone="teal" disabled={!validAmount} onClick={() => void onReview(request.id, "approved", tokenAmount)}>
+            Approve
+          </AdminButton>
+          <AdminButton tone="danger" onClick={() => void onReview(request.id, "rejected")}>Reject</AdminButton>
+        </div>
+      )}
+    </Row>
   );
 }
