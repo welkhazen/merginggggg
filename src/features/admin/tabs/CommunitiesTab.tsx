@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Lock, LockOpen, MessageSquareReply, RefreshCw, Search, Send, Trash2, Users, X } from "lucide-react";
+import { ChevronDown, Lock, LockOpen, MessageSquareReply, RefreshCw, Search, Send, Trash2, Users, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
 import { isCommunityRealtimeConfigured, subscribeToCommunityMessages, unsubscribeFromCommunityMessages } from "@/lib/communityRealtime";
@@ -35,9 +35,16 @@ export function CommunitiesTab() {
   const { data: communities, loading, reload } = useAsyncData(fetchCommunities);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [savingLockId, setSavingLockId] = useState<string | null>(null);
+  const [sectionsOpen, setSectionsOpen] = useState({ unlocked: true, locked: true });
 
   const selected = communities?.find((community) => community.id === selectedId) ?? null;
-  const visibleCommunities = useMemo(() => communities ?? [], [communities]);
+  const groupedCommunities = useMemo(() => {
+    const list = communities ?? [];
+    return {
+      unlocked: list.filter((community) => !community.locked),
+      locked: list.filter((community) => community.locked),
+    };
+  }, [communities]);
 
   async function toggleLock(community: CommunitySummary) {
     if (savingLockId) return;
@@ -68,32 +75,65 @@ export function CommunitiesTab() {
         }
       >
         {communities && communities.length === 0 && <EmptyState>No communities yet.</EmptyState>}
-        <div className="space-y-2">
-          {visibleCommunities.map((community) => {
-            const savingLock = savingLockId === community.id;
+        <div className="space-y-4">
+          {([
+            { key: "unlocked" as const, title: "Unlocked rooms", tone: "green" as const, rooms: groupedCommunities.unlocked },
+            { key: "locked" as const, title: "Locked rooms", tone: "red" as const, rooms: groupedCommunities.locked },
+          ]).map((section) => {
+            const isOpen = sectionsOpen[section.key];
             return (
-              <Row key={community.id}>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-raw-text">
-                    {community.title} {community.abbr && <span className="text-raw-silver/40">({community.abbr})</span>}
-                  </p>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-raw-silver/50">
-                    {community.status && <Tag tone={community.status === "Active" ? "green" : "teal"}>{community.status}</Tag>}
-                    {community.locked && <Tag tone="red">Locked</Tag>}
-                    <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" /> {community.memberCount}</span>
-                    {community.topic && <span className="truncate">{community.topic}</span>}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <AdminButton tone="outline" onClick={() => setSelectedId(selectedId === community.id ? null : community.id)}>
-                    {selectedId === community.id ? "Close" : "Inspect"}
-                  </AdminButton>
-                  <AdminButton tone={community.locked ? "teal" : "danger"} disabled={savingLock} onClick={() => void toggleLock(community)}>
-                    {community.locked ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                    {savingLock ? "Saving" : community.locked ? "Unlock" : "Lock"}
-                  </AdminButton>
-                </div>
-              </Row>
+              <section key={section.key} className="rounded-2xl border border-raw-border/20 bg-raw-black/20">
+                <button
+                  type="button"
+                  onClick={() => setSectionsOpen((current) => ({ ...current, [section.key]: !current[section.key] }))}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
+                  aria-expanded={isOpen}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Tag tone={section.tone}>{section.title}</Tag>
+                    <span className="text-xs text-raw-silver/45">{section.rooms.length} room{section.rooms.length === 1 ? "" : "s"}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-raw-silver/55">
+                    {isOpen ? "Collapse" : "Expand"}
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  </span>
+                </button>
+
+                {isOpen && (
+                  <div className="space-y-2 border-t border-raw-border/15 p-2">
+                    {section.rooms.length === 0 && (
+                      <p className="px-2 py-4 text-sm text-raw-silver/40">No {section.key} rooms.</p>
+                    )}
+                    {section.rooms.map((community) => {
+                      const savingLock = savingLockId === community.id;
+                      return (
+                        <Row key={community.id}>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-raw-text">
+                              {community.title} {community.abbr && <span className="text-raw-silver/40">({community.abbr})</span>}
+                            </p>
+                            <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-raw-silver/50">
+                              {community.status && <Tag tone={community.status === "Active" ? "green" : "teal"}>{community.status}</Tag>}
+                              {community.locked && <Tag tone="red">Locked</Tag>}
+                              <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" /> {community.memberCount}</span>
+                              {community.topic && <span className="truncate">{community.topic}</span>}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <AdminButton tone="outline" onClick={() => setSelectedId(selectedId === community.id ? null : community.id)}>
+                              {selectedId === community.id ? "Close" : "Inspect"}
+                            </AdminButton>
+                            <AdminButton tone={community.locked ? "teal" : "danger"} disabled={savingLock} onClick={() => void toggleLock(community)}>
+                              {community.locked ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                              {savingLock ? "Saving" : community.locked ? "Unlock" : "Lock"}
+                            </AdminButton>
+                          </div>
+                        </Row>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
             );
           })}
         </div>
