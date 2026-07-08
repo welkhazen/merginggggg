@@ -6,11 +6,12 @@ import helmet from "helmet";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import rateLimit from "express-rate-limit";
-import { env } from "./config/env";
-import { SupabaseAdminError } from "./lib/supabaseAdmin";
-import { adminRouter } from "./routes/admin/index";
-import { authRouter } from "./routes/auth";
-import { errorsRouter } from "./routes/errors";
+import { configErrors, env } from "./config/env.js";
+import { SupabaseAdminError } from "./lib/supabaseAdmin.js";
+import { adminRouter } from "./routes/admin/index.js";
+import { authRouter } from "./routes/auth.js";
+import { errorsRouter } from "./routes/errors.js";
+import { waitlistRouter } from "./routes/waitlist.js";
 
 const app = express();
 const isProduction = env.NODE_ENV === "production";

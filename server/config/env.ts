@@ -35,6 +35,19 @@ function deriveProductionSessionSecret(serviceRoleKey: string) {
   return createHash("sha256").update(`raw-admin-session:${serviceRoleKey}`).digest("hex");
 }
 
+const serverEnv = {
+  ...process.env,
+  SUPABASE_URL:
+    emptyToUndefined(process.env.SUPABASE_URL) ??
+    emptyToUndefined(process.env.NEXT_PUBLIC_SUPABASE_URL) ??
+    emptyToUndefined(process.env.VITE_SUPABASE_URL) ??
+    emptyToUndefined(process.env.VITE_PUBLIC_SUPABASE_URL),
+  SUPABASE_SERVICE_ROLE_KEY:
+    emptyToUndefined(process.env.SUPABASE_SERVICE_ROLE_KEY) ??
+    emptyToUndefined(process.env.SUPABASE_SERVICE_KEY) ??
+    emptyToUndefined(process.env.SUPABASE_SECRET_KEY),
+};
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   API_PORT: z.coerce.number().int().positive().default(8787),
@@ -76,7 +89,7 @@ if (!parsedEnv.success) {
   console.error("[startup] Invalid environment configuration", parsedEnv.error.flatten().fieldErrors);
 }
 
-if (parsedEnv.data.NODE_ENV === "production" && parsedEnv.data.SESSION_SECRET === DEFAULT_SESSION_SECRET) {
+if (parsedEnv.success && parsedEnv.data.NODE_ENV === "production" && parsedEnv.data.SESSION_SECRET === DEFAULT_SESSION_SECRET) {
   if (parsedEnv.data.SUPABASE_SERVICE_ROLE_KEY) {
     parsedEnv.data.SESSION_SECRET = deriveProductionSessionSecret(parsedEnv.data.SUPABASE_SERVICE_ROLE_KEY);
     console.warn(
@@ -88,5 +101,15 @@ if (parsedEnv.data.NODE_ENV === "production" && parsedEnv.data.SESSION_SECRET ==
   }
 }
 
-export const env = parsedEnv.data;
+export const env = parsedEnv.success
+  ? parsedEnv.data
+  : {
+      NODE_ENV: "development" as const,
+      API_PORT: 8787,
+      CORS_ORIGIN: "http://localhost:8080",
+      SESSION_SECRET: DEFAULT_SESSION_SECRET,
+      SUPABASE_URL: "",
+      SUPABASE_SERVICE_ROLE_KEY: "",
+      CRASH_ALERT_APP_NAME: "raW",
+    };
 export const isSupabaseConfigured = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
