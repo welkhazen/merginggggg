@@ -24,7 +24,7 @@ export function ContainerTextFlip({
   const id = useId();
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [width, setWidth] = useState(100);
-  const textRef = React.useRef(null);
+  const textRef = React.useRef<HTMLSpanElement>(null);
   const containerStyle = {
     background: "linear-gradient(180deg, rgb(var(--raw-surface) / 0.96) 0%, rgb(var(--raw-black) / 0.9) 100%)",
     boxShadow:
@@ -33,7 +33,6 @@ export function ContainerTextFlip({
   const updateWidthForWord = () => {
     if (textRef.current) {
       // Add some padding to the text width (30px on each side)
-      // @ts-ignore
       const textWidth = textRef.current.scrollWidth + 30;
       setWidth(textWidth);
     }

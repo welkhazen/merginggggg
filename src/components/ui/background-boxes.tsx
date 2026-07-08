@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 export const BoxesCore = ({ className, ...rest }: { className?: string }) => {
   const rows = new Array(30).fill(1);
   const cols = new Array(20).fill(1);
-  let colors = [
+  const colors = [
     "#F1C42D",     // raW gold
     "#D4A81A",     // deep gold
     "#FFE066",     // light gold
