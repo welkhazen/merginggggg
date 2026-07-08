@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { Lock, LockOpen, RefreshCw, Trash2, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Lock, LockOpen, MessageSquareReply, RefreshCw, Send, Trash2, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
+import { isCommunityRealtimeConfigured, subscribeToCommunityMessages, unsubscribeFromCommunityMessages } from "@/lib/communityRealtime";
 import {
   deleteCommunityMessage,
   fetchCommunities,
   fetchCommunityMembers,
   fetchCommunityMessages,
+  sendCommunityMessage,
   updateCommunity,
   type CommunityMessage,
   type CommunitySummary,
@@ -18,6 +20,10 @@ export function CommunitiesTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const selected = communities?.find((community) => community.id === selectedId) ?? null;
+  const visibleCommunities = useMemo(() => {
+    const open = (communities ?? []).filter((community) => !community.locked).slice(0, 3);
+    return open.length > 0 ? open : (communities ?? []).slice(0, 3);
+  }, [communities]);
 
   async function toggleLock(community: CommunitySummary) {
     try {
@@ -35,7 +41,7 @@ export function CommunitiesTab() {
     <>
       <Panel
         title="Community rooms"
-        hint="Browse rooms, lock/unlock them, and inspect their chat."
+        hint="Live moderator view for the current three unlocked rooms. Inspect to watch chat in near real time and reply from the dashboard."
         actions={
           <AdminButton tone="outline" disabled={loading} onClick={reload} aria-label="Refresh communities">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -44,7 +50,7 @@ export function CommunitiesTab() {
       >
         {communities && communities.length === 0 && <EmptyState>No communities yet.</EmptyState>}
         <div className="space-y-2">
-          {communities?.map((community) => (
+          {visibleCommunities.map((community) => (
             <Row key={community.id}>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-raw-text">
@@ -78,8 +84,55 @@ export function CommunitiesTab() {
 function CommunityInspector({ community }: { community: CommunitySummary }) {
   const [filter, setFilter] = useState<"all" | "deleted" | "flagged">("all");
   const [view, setView] = useState<"messages" | "members">("messages");
-  const messages = useAsyncData(() => fetchCommunityMessages(community.id, filter), [community.id, filter]);
+  const [draft, setDraft] = useState("");
+  const [replyTo, setReplyTo] = useState<CommunityMessage | null>(null);
+  const [sending, setSending] = useState(false);
+  const { data: messageData, setData: setMessageData, reload: reloadMessages } = useAsyncData(() => fetchCommunityMessages(community.id, filter), [community.id, filter]);
+  const [realtimeFallback, setRealtimeFallback] = useState(!isCommunityRealtimeConfigured());
   const members = useAsyncData(() => fetchCommunityMembers(community.id), [community.id]);
+
+  useEffect(() => {
+    setRealtimeFallback(!isCommunityRealtimeConfigured());
+  }, [community.id]);
+
+  useEffect(() => {
+    if (view !== "messages") return;
+
+    const channel = subscribeToCommunityMessages(
+      community.id,
+      (message, eventType) => {
+        if (filter === "deleted" && !message.isDeleted) return;
+        if (filter === "flagged" && !message.moderationStatus) return;
+
+        setMessageData((current) => {
+          const messages = current ?? [];
+          if (eventType === "DELETE") return messages.filter((item) => item.id !== message.id);
+
+          const next = [message, ...messages.filter((item) => item.id !== message.id)];
+          return next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 50);
+        });
+      },
+      () => {
+        setRealtimeFallback(true);
+      },
+    );
+
+    if (!channel) {
+      setRealtimeFallback(true);
+      return;
+    }
+
+    setRealtimeFallback(false);
+    return () => unsubscribeFromCommunityMessages(channel);
+  }, [community.id, filter, setMessageData, view]);
+
+  useEffect(() => {
+    if (view !== "messages" || !realtimeFallback) return;
+    const timer = window.setInterval(() => {
+      reloadMessages();
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [realtimeFallback, reloadMessages, view]);
 
   async function removeMessage(message: CommunityMessage) {
     const reason = window.prompt(`Delete this message from @${message.senderName ?? "unknown"}?\nOptional reason:`);
@@ -88,17 +141,37 @@ function CommunityInspector({ community }: { community: CommunitySummary }) {
       await deleteCommunityMessage(message.id, reason || undefined);
       captureAdminEvent("admin_message_deleted", { community_id: community.id });
       toast({ title: "Message removed" });
-      messages.reload();
+      reloadMessages();
     } catch (error) {
       captureAdminException(error, { action: "admin_message_delete" });
       toast({ title: "Could not delete message" });
     }
   }
 
+  async function sendMessage(event: React.FormEvent) {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!text) return;
+    setSending(true);
+    try {
+      await sendCommunityMessage(community.id, { text, replyToMessageId: replyTo?.id });
+      captureAdminEvent("admin_community_message_sent", { community_id: community.id, reply: Boolean(replyTo) });
+      setDraft("");
+      setReplyTo(null);
+      reloadMessages();
+      toast({ title: "Message sent" });
+    } catch (error) {
+      captureAdminException(error, { action: "admin_community_message_send" });
+      toast({ title: "Could not send message", description: error instanceof Error ? error.message : undefined });
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <Panel
       title={`Inspecting: ${community.title}`}
-      hint="Messages include deleted and flagged content; deletions here are soft deletes visible to the main app."
+      hint={realtimeFallback ? "Realtime is unavailable, so this view is temporarily falling back to 3-second refreshes." : "Realtime is active for messages; deletions here are soft deletes visible to the main app."}
       actions={
         <div className="flex gap-2">
           <SelectField value={view} onChange={(event) => setView(event.target.value as typeof view)}>
@@ -117,8 +190,32 @@ function CommunityInspector({ community }: { community: CommunitySummary }) {
     >
       {view === "messages" ? (
         <div className="space-y-2">
-          {messages.data && messages.data.length === 0 && <EmptyState>No messages match this filter.</EmptyState>}
-          {messages.data?.map((message) => (
+          <form onSubmit={sendMessage} className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3">
+            {replyTo && (
+              <div className="mb-2 flex items-start justify-between gap-3 rounded-lg border border-raw-border/30 bg-raw-black/40 px-3 py-2 text-xs text-raw-silver/55">
+                <span className="min-w-0 truncate">
+                  Replying to <b className="text-raw-text">@{replyTo.senderName ?? "unknown"}</b>: {replyTo.text}
+                </span>
+                <button type="button" className="text-raw-silver/45 hover:text-raw-text" onClick={() => setReplyTo(null)}>
+                  Clear
+                </button>
+              </div>
+            )}
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                maxLength={1000}
+                placeholder={`Reply as moderator in ${community.title}`}
+                className="min-h-11 rounded-xl border border-raw-border/30 bg-raw-black/45 px-3 text-sm text-raw-text placeholder:text-raw-silver/25 focus:border-cyan-300/50 focus:outline-none"
+              />
+              <AdminButton type="submit" tone="teal" disabled={sending || !draft.trim()}>
+                <Send className="h-4 w-4" /> {sending ? "Sending" : "Send"}
+              </AdminButton>
+            </div>
+          </form>
+          {messageData && messageData.length === 0 && <EmptyState>No messages match this filter.</EmptyState>}
+          {messageData?.map((message) => (
             <Row key={message.id}>
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-2 text-xs text-raw-silver/55">
@@ -140,9 +237,14 @@ function CommunityInspector({ community }: { community: CommunitySummary }) {
                 {message.deletedReason && <p className="mt-1 text-xs text-raw-silver/40">Reason: {message.deletedReason}</p>}
               </div>
               {!message.isDeleted && (
-                <AdminButton tone="danger" onClick={() => void removeMessage(message)} aria-label="Delete message">
-                  <Trash2 className="h-4 w-4" />
-                </AdminButton>
+                <div className="flex gap-2">
+                  <AdminButton tone="outline" onClick={() => setReplyTo(message)} aria-label="Reply to message">
+                    <MessageSquareReply className="h-4 w-4" />
+                  </AdminButton>
+                  <AdminButton tone="danger" onClick={() => void removeMessage(message)} aria-label="Delete message">
+                    <Trash2 className="h-4 w-4" />
+                  </AdminButton>
+                </div>
               )}
             </Row>
           ))}

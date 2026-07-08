@@ -146,7 +146,7 @@ function BannedWordsPanel() {
               <div>
                 <p className="flex flex-wrap items-center gap-2 text-sm text-raw-text">
                   {entry.word}
-                  {entry.action && <Tag tone={entry.action === "block" ? "red" : "gold"}>{entry.action}</Tag>}
+                  {entry.action && <Tag tone={entry.action.toLowerCase() === "block" ? "red" : "gold"}>{entry.action}</Tag>}
                   {entry.category && <Tag tone="teal">{entry.category}</Tag>}
                 </p>
                 <p className="text-[10px] text-raw-silver/35">

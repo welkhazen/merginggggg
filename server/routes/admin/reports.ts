@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
-import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics";
-import { writeAudit } from "../../lib/audit";
-import { selectRows, updateRows } from "../../lib/supabaseAdmin";
-import { adminSession } from "../../middleware/adminAuth";
+import { captureServerEvent, getPostHogDistinctId } from "../../lib/analytics.js";
+import { writeAudit } from "../../lib/audit.js";
+import { selectRows, updateRows } from "../../lib/supabaseAdmin.js";
+import { adminSession } from "../../middleware/adminAuth.js";
 
 type ChatReportRow = {
   id: string;

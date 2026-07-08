@@ -73,6 +73,11 @@ export type CommunityMessage = {
   replyToText: string | null;
 };
 
+export type SendCommunityMessageInput = {
+  text: string;
+  replyToMessageId?: string;
+};
+
 export type CommunityMember = {
   userId: string;
   username: string | null;
@@ -339,6 +344,9 @@ export async function login(username: string, password: string): Promise<AdminUs
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
+  // A stale static deployment can answer 200 with index.html; jsonRequest
+  // then yields an empty body. Treat it as a broken API, not a success.
+  if (!body?.user) throw new Error("api_unavailable");
   return body.user;
 }
 
@@ -375,6 +383,17 @@ export async function fetchCommunityMessages(
     `/api/admin/communities/${encodeURIComponent(id)}/messages?filter=${filter}`,
   );
   return body.messages;
+}
+
+export async function sendCommunityMessage(id: string, input: SendCommunityMessageInput): Promise<CommunityMessage> {
+  const body = await jsonRequest<{ message: CommunityMessage }>(
+    `/api/admin/communities/${encodeURIComponent(id)}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return body.message;
 }
 
 export async function fetchCommunityMembers(id: string): Promise<CommunityMember[]> {
@@ -442,6 +461,12 @@ export async function moderateUser(
   await jsonRequest<{ ok: true }>("/api/admin/moderate-user", {
     method: "POST",
     body: JSON.stringify({ username, action, minutes, reason }),
+  });
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await jsonRequest<{ ok: true }>(`/api/admin/users/${encodeURIComponent(id)}`, {
+    method: "DELETE",
   });
 }
 

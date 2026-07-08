@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { countRows } from "../../lib/supabaseAdmin";
+import { countRows } from "../../lib/supabaseAdmin.js";
 
 export const statsRouter = Router();
 
