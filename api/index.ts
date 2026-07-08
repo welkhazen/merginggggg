@@ -14,11 +14,15 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 type NodeHandler = (req: IncomingMessage, res: ServerResponse) => unknown;
 
 const require = createRequire(import.meta.url);
+let cachedApp: NodeHandler | null = null;
 
 async function loadApp(): Promise<NodeHandler> {
   if (cachedApp) return cachedApp;
-  const mod = (await import("../server/index.js")) as { default: NodeHandler };
-  cachedApp = mod.default;
+  const mod = require("./_server/index.cjs") as { default?: NodeHandler } | NodeHandler;
+  cachedApp = typeof mod === "function" ? mod : mod.default ?? null;
+  if (!cachedApp) {
+    throw new Error("Bundled server did not export a handler.");
+  }
   return cachedApp;
 }
 
@@ -32,7 +36,5 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.statusCode = 500;
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify({ error: "server_init_failed", detail }));
-  };
+  }
 }
-
-export default app;

@@ -1,4 +1,4 @@
-import { env, isSupabaseConfigured } from "../config/env";
+import { env, isSupabaseConfigured } from "../config/env.js";
 
 type QueryValue = string | number | boolean | null | undefined;
 
