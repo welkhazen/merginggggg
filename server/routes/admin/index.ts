@@ -17,11 +17,11 @@ import { wordsRouter } from "./words.js";
 export const adminRouter = Router();
 
 // Tier ladder: moderator < admin < owner < super_admin.
-// Content moderation is open to every staff tier.
-adminRouter.use(requireTier("moderator"), statsRouter, communitiesRouter, reportsRouter, flagsRouter, usersRouter);
+// Content moderation and community request visibility are open to every staff tier.
+adminRouter.use(requireTier("moderator"), statsRouter, communitiesRouter, reportsRouter, flagsRouter, usersRouter, requestsRouter);
 
 // Community programs, commerce, filters, invites, analytics: admin and up.
-adminRouter.use(requireTier("admin"), requestsRouter, commerceRouter, wordsRouter, invitesRouter, analyticsRouter);
+adminRouter.use(requireTier("admin"), commerceRouter, wordsRouter, invitesRouter, analyticsRouter);
 
 // Staff management and the audit trail: owner and up.
 adminRouter.use(requireTier("owner"), staffRouter, auditLogRouter);
