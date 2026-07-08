@@ -37,7 +37,7 @@ begin
     raise exception 'token_request_missing_user' using errcode = 'P0003';
   end if;
 
-  update public.profiles p
+  update public.users p
     set token_balance = coalesce(p.token_balance, 0) + p_token_amount
     where p.id = v_request.user_id;
 
