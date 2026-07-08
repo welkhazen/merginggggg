@@ -251,79 +251,112 @@ function CommunityInspector({ community }: { community: CommunitySummary }) {
       }
     >
       {view === "messages" ? (
-        <div className="flex min-h-[560px] flex-col overflow-hidden rounded-2xl border border-raw-border/20 bg-raw-black/35">
-          <div className="flex flex-wrap items-center gap-2 border-b border-raw-border/15 px-3 py-2">
-            <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-raw-border/25 bg-raw-surface/40 px-3 py-1.5">
-              <Search className="h-3.5 w-3.5 shrink-0 text-raw-silver/40" />
+        <div className="rounded-[22px] bg-[#eef3f4] p-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] [background-image:radial-gradient(rgba(18,63,76,.13)_1px,transparent_1px)] [background-size:9px_9px]">
+          <div className="mb-4 rounded-[18px] border border-[#ded8cb] bg-[#f8f5ee] px-5 py-4 text-[#1f2528] shadow-[0_8px_28px_rgba(0,0,0,0.08)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#ddd6c9] bg-white text-sm font-semibold text-[#111827]">
+                  {community.abbr?.slice(0, 2) ?? "RA"}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate font-display text-xl leading-tight tracking-wide text-[#171717]">{community.title}</p>
+                  <p className="mt-1 text-xs text-[#77736b]">{community.topic ?? "Live community room"}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-[#d8d0c2] bg-white px-3 py-1 text-[11px] text-[#6f6a62]">
+                  {realtimeFallback ? "3s refresh" : "Realtime"}
+                </span>
+                <span className="rounded-full border border-lime-300 bg-lime-50 px-3 py-1 text-[11px] text-lime-700">
+                  Admin preview
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex h-[min(760px,calc(100dvh-180px))] min-h-[620px] flex-col overflow-hidden rounded-[18px] border border-[#ded8cb] bg-[#fbfaf7] text-[#1f2528] shadow-[0_10px_36px_rgba(0,0,0,0.1)]">
+          <div className="flex flex-wrap items-center gap-2 border-b border-[#e6e0d5] px-4 py-3">
+            <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-[#d9d2c7] bg-white px-3 py-2">
+              <Search className="h-3.5 w-3.5 shrink-0 text-[#9b968d]" />
               <input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search this group chat"
-                className="w-full bg-transparent text-sm text-raw-text placeholder:text-raw-silver/30 focus:outline-none"
+                className="w-full bg-transparent text-sm text-[#1f2528] placeholder:text-[#b9b3aa] focus:outline-none"
               />
               {searchQuery && (
-                <button type="button" onClick={() => setSearchQuery("")} className="rounded-full p-0.5 text-raw-silver/40 hover:text-raw-text" aria-label="Clear search">
+                <button type="button" onClick={() => setSearchQuery("")} className="rounded-full p-0.5 text-[#9b968d] hover:text-[#1f2528]" aria-label="Clear search">
                   <X className="h-3 w-3" />
                 </button>
               )}
             </div>
-            <Tag tone={realtimeFallback ? "gold" : "green"}>{realtimeFallback ? "3s refresh" : "Realtime"}</Tag>
+            <SelectField value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} className="border-[#d9d2c7] bg-white text-[#1f2528]">
+              <option value="all">All</option>
+              <option value="deleted">Deleted</option>
+              <option value="flagged">Flagged</option>
+            </SelectField>
           </div>
 
-          <div ref={messagesRef} className="flex-1 space-y-4 overflow-y-auto p-4">
+          <div ref={messagesRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
             {groupedMessages.map((group) => (
               <div key={group.label} className="space-y-3">
                 <div className="sticky top-0 z-10 flex justify-center py-1">
-                  <span className="rounded-full border border-raw-border/20 bg-raw-black/85 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-raw-silver/40 backdrop-blur">
+                  <span className="border border-[#ded8cb] bg-[#fbfaf7] px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[#9b968d] shadow-sm">
                     {group.label}
                   </span>
                 </div>
                 {group.messages.map((message) => {
                   const isModeratorMessage = (message.senderName ?? "").toLowerCase().includes("moderator") || message.senderId === "admin";
                   return (
-                    <article key={message.id} className={`flex w-full ${isModeratorMessage ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`group/msg max-w-[88%] rounded-2xl border px-3.5 py-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.22)] ${
-                          isModeratorMessage
-                            ? "border-raw-gold/25 bg-raw-gold/[0.09] text-raw-text"
-                            : "border-raw-border/25 bg-raw-surface/30 text-raw-silver/80"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.12em]">
-                          <span className={isModeratorMessage ? "text-raw-gold/85" : "text-raw-gold/65"}>@{message.senderName ?? "unknown"}</span>
-                          <span className="text-raw-silver/30">{formatChatTime(message.createdAt)}</span>
-                          {message.isDeleted && <Tag tone="red">Deleted</Tag>}
-                          {message.moderationStatus && message.moderationStatus !== "removed" && <Tag tone="gold">{message.moderationStatus}</Tag>}
+                    <article
+                      key={message.id}
+                      className={`group/msg flex min-h-8 w-full items-center gap-2 border px-3 py-2 text-sm ${
+                        isModeratorMessage
+                          ? "border-lime-300 bg-lime-50/80"
+                          : "border-[#e4ddcf] bg-[#fbfaf7]"
+                      }`}
+                    >
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#d7cfbf] bg-[#15120f] text-[10px] font-semibold text-[#f4c536]">
+                        {(message.senderName ?? "?").slice(0, 1).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className={isModeratorMessage ? "text-lime-700 text-xs font-semibold" : "text-lime-600 text-xs font-semibold"}>@{message.senderName ?? "unknown"}:</span>
+                          <span className={`min-w-0 break-words text-xs ${message.isDeleted ? "italic text-[#9b968d] line-through" : "text-[#3b3a36]"}`}>
+                            {message.text}
+                          </span>
+                          <span className="shrink-0 text-[10px] text-[#9b968d]">{formatChatTime(message.createdAt)}</span>
+                          {message.isDeleted && <span className="rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-red-500">Deleted</span>}
+                          {message.moderationStatus && message.moderationStatus !== "removed" && (
+                            <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-red-600">{message.moderationStatus}</span>
+                          )}
                         </div>
                         {message.replyToText && (
-                          <div className="mt-2 rounded-xl border border-raw-border/20 bg-raw-black/20 px-3 py-2 text-xs text-raw-silver/55">
-                            <p className="font-medium text-raw-gold/75">Replying to @{message.replyToSenderName ?? "unknown"}</p>
-                            <p className="mt-1 truncate">{message.replyToText}</p>
-                          </div>
-                        )}
-                        <p className={`mt-2 text-sm leading-relaxed ${message.isDeleted ? "italic text-raw-silver/40 line-through" : ""}`}>
-                          {message.text}
-                        </p>
-                        {message.deletedReason && <p className="mt-2 text-xs text-raw-silver/40">Reason: {message.deletedReason}</p>}
-                        {!message.isDeleted && (
-                          <div className="mt-3 flex flex-wrap justify-end gap-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover/msg:opacity-100">
-                            <button
-                              type="button"
-                              onClick={() => setReplyTo(message)}
-                              className="inline-flex items-center gap-1 rounded-full border border-raw-border/25 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-raw-silver/70 transition-colors hover:border-raw-gold/35 hover:text-raw-gold"
-                            >
-                              <MessageSquareReply className="h-3 w-3" /> Reply
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void removeMessage(message)}
-                              className="inline-flex items-center gap-1 rounded-full border border-red-400/25 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-red-200/80 transition-colors hover:bg-red-500/10"
-                            >
-                              <Trash2 className="h-3 w-3" /> Delete
-                            </button>
-                          </div>
+                          <p className="mt-1 truncate border-l-2 border-[#d8d0c2] pl-2 text-[11px] text-[#8f887e]">
+                            @{message.replyToSenderName ?? "unknown"}: {message.replyToText}
+                          </p>
                         )}
                       </div>
+                      {!message.isDeleted && (
+                        <div className="ml-auto flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover/msg:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => setReplyTo(message)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#ded8cb] bg-white text-[#7c766d] hover:border-lime-300 hover:text-lime-700"
+                            aria-label="Reply to message"
+                          >
+                            <MessageSquareReply className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void removeMessage(message)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 hover:bg-red-100"
+                            aria-label="Delete message"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </article>
                   );
                 })}
@@ -334,30 +367,36 @@ function CommunityInspector({ community }: { community: CommunitySummary }) {
             {messageData && messageData.length > 0 && groupedMessages.length === 0 && <EmptyState>No messages match your search.</EmptyState>}
           </div>
 
-          <form onSubmit={sendMessage} className="border-t border-raw-border/15 bg-raw-black/35 px-3 py-3">
+          <form onSubmit={sendMessage} className="border-t border-[#e6e0d5] bg-[#fbfaf7] px-3 py-3">
             {replyTo && (
-              <div className="mb-2 flex items-start justify-between gap-3 rounded-xl border border-raw-gold/20 bg-raw-gold/[0.06] px-3 py-2 text-xs text-raw-silver/60">
+              <div className="mb-2 flex items-start justify-between gap-3 rounded-xl border border-lime-300 bg-lime-50 px-3 py-2 text-xs text-[#6f6a62]">
                 <span className="min-w-0 truncate">
-                  Replying to <b className="text-raw-text">@{replyTo.senderName ?? "unknown"}</b>: {replyTo.text}
+                  Replying to <b className="text-[#1f2528]">@{replyTo.senderName ?? "unknown"}</b>: {replyTo.text}
                 </span>
-                <button type="button" className="text-raw-silver/45 hover:text-raw-text" onClick={() => setReplyTo(null)} aria-label="Clear reply">
+                <button type="button" className="text-[#8f887e] hover:text-[#1f2528]" onClick={() => setReplyTo(null)} aria-label="Clear reply">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
-            <div className="flex gap-2 rounded-xl border border-cyan-400/25 bg-cyan-400/[0.06] p-2">
+            <div className="flex gap-2 rounded-xl border border-[#ded8cb] bg-white p-2">
               <input
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 maxLength={1000}
-                placeholder={`Reply as moderator in ${community.title}`}
-                className="min-h-11 flex-1 rounded-xl border border-raw-border/20 bg-raw-black/45 px-3 text-sm text-raw-text placeholder:text-raw-silver/25 focus:border-cyan-300/50 focus:outline-none"
+                placeholder="Type a message..."
+                className="min-h-11 flex-1 rounded-xl border border-transparent bg-transparent px-3 text-sm text-[#1f2528] placeholder:text-[#bbb5ad] focus:border-lime-300 focus:outline-none"
               />
-              <AdminButton type="submit" tone="teal" disabled={sending || !draft.trim()}>
-                <Send className="h-4 w-4" /> {sending ? "Sending" : "Send"}
-              </AdminButton>
+              <button
+                type="submit"
+                disabled={sending || !draft.trim()}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ded8cb] bg-white text-[#6f6a62] transition-colors hover:border-lime-300 hover:text-lime-700 disabled:opacity-45"
+                aria-label="Send message"
+              >
+                <Send className="h-4 w-4" />
+              </button>
             </div>
           </form>
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
