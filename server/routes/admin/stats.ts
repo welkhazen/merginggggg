@@ -27,7 +27,7 @@ statsRouter.get("/stats", async (_req, res) => {
     countRows("moderation_flags", { reviewed: "eq.false" }),
     countRows("community_requests", { status: "eq.pending" }),
     countRows("donation_interests", { status: "eq.pending" }),
-    countRows("token_requests", { status: "eq.pending" }),
+    countRows("token_requests", { status: "in.(pending,new)" }),
     countRows("appeals", { status: "eq.pending" }),
     countRows("error_events", { resolved: "eq.false" }),
     countRows("communities"),

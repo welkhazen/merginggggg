@@ -76,6 +76,8 @@ function mapDonation(row: DonationInterestRow) {
 }
 
 function mapTokenRequest(row: TokenRequestRow | TokenRequestRowWithoutTokens) {
+  const status = row.status === "new" ? "pending" : row.status;
+
   return {
     id: row.id,
     userId: row.user_id,
@@ -84,9 +86,16 @@ function mapTokenRequest(row: TokenRequestRow | TokenRequestRowWithoutTokens) {
     priceUsd: row.price_usd,
     reasons: row.reasons ?? [],
     note: row.note,
-    status: row.status,
+    status,
     createdAt: row.created_at,
   };
+}
+
+function tokenRequestStatusFilter(status: string): string | undefined {
+  if (status === "pending") return "in.(pending,new)";
+  if (status === "new") return "eq.new";
+  if (status === "all") return undefined;
+  return `eq.${status}`;
 }
 
 export const commerceRouter = Router();
@@ -140,7 +149,8 @@ commerceRouter.get("/token-requests", async (req, res) => {
     order: "created_at.desc",
     limit: 100,
   };
-  if (status !== "all") params.status = `eq.${status}`;
+  const statusFilter = tokenRequestStatusFilter(status);
+  if (statusFilter) params.status = statusFilter;
 
   let rows: Array<TokenRequestRow | TokenRequestRowWithoutTokens>;
   try {
@@ -173,6 +183,9 @@ commerceRouter.patch("/token-requests/:id", async (req, res) => {
   });
   const requestRow = requestRows[0];
   if (!requestRow) return res.status(404).json({ error: "token_request_not_found" });
+  if (!["pending", "new"].includes(requestRow.status) && ["approved", "rejected"].includes(parsed.data.status)) {
+    return res.status(409).json({ error: "token_request_already_reviewed" });
+  }
 
   let rows: TokenRequestRow[];
   let creditedTokens: number | undefined;
