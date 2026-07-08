@@ -121,8 +121,10 @@ wordsRouter.post("/banned-words", async (req, res) => {
   const row = await insertRow<BannedWordRow>("banned_words", {
     word: parsed.data.word,
     normalized_word: parsed.data.word.toLowerCase(),
-    action: parsed.data.action.toUpperCase(),
-    category: parsed.data.category?.toUpperCase() ?? null,
+    // Store lowercase to match the banned_words_action_check constraint and the
+    // existing rows; the frontend upper-cases only for the badge display.
+    action: parsed.data.action.toLowerCase(),
+    category: parsed.data.category?.toLowerCase() ?? null,
     added_by: session.username,
   });
   await writeAudit(session, {

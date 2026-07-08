@@ -108,6 +108,7 @@ export type ModerationFlag = {
   messageId: string | null;
   communityId: string | null;
   senderId: string | null;
+  senderName: string | null;
   matchedWord: string | null;
   reason: string | null;
   verdict: string | null;
