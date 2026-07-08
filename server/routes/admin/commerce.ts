@@ -76,7 +76,7 @@ function mapDonation(row: DonationInterestRow) {
 }
 
 function mapTokenRequest(row: TokenRequestRow | TokenRequestRowWithoutTokens) {
-  const status = row.status === "new" ? "pending" : row.status;
+  const status = row.status === "new" ? "pending" : row.status === "fulfilled" ? "approved" : row.status;
 
   return {
     id: row.id,
@@ -93,6 +93,7 @@ function mapTokenRequest(row: TokenRequestRow | TokenRequestRowWithoutTokens) {
 
 function tokenRequestStatusFilter(status: string): string | undefined {
   if (status === "pending") return "in.(pending,new)";
+  if (status === "approved") return "in.(approved,fulfilled)";
   if (status === "new") return "eq.new";
   if (status === "all") return undefined;
   return `eq.${status}`;
@@ -211,7 +212,7 @@ commerceRouter.patch("/token-requests/:id", async (req, res) => {
         approvedRows = await updateRows<Array<{ id: string; username: string | null; credited_tokens: number }>[number]>(
           "token_requests",
           { id: `eq.${req.params.id}`, status: "in.(pending,new)" },
-          { tokens: tokenAmount, status: "approved" },
+          { tokens: tokenAmount, status: "fulfilled" },
         ).then((updatedRows) =>
           updatedRows.map((row) => ({
             id: row.id,
