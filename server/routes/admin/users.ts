@@ -33,6 +33,11 @@ const usersQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+const userSearchSchema = z.object({
+  q: z.string().trim().min(1).max(48),
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
+
 const moderateSchema = z.object({
   username: z.string().trim().min(3).max(24),
   action: z.enum(["warn", "timeout", "ban", "unban"]),
@@ -78,6 +83,19 @@ async function findUserByUsername(username: string) {
 }
 
 export const usersRouter = Router();
+
+usersRouter.get("/users/search", requireTier("moderator"), async (req, res) => {
+  const parsed = userSearchSchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_query" });
+
+  const rows = await selectRows<DbUser>("users", {
+    select: USER_SELECT,
+    username: `ilike.*${parsed.data.q.replace(/[%_*,()\\]/g, "")}*`,
+    order: "created_at.desc",
+    limit: parsed.data.limit,
+  });
+  return res.status(200).json({ users: rows.map(mapUser) });
+});
 
 usersRouter.get("/users", requireTier("admin"), async (req, res) => {
   const parsed = usersQuerySchema.safeParse(req.query);

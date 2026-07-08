@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Ban, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
-import { fetchStats, fetchUsers, moderateUser, type ManagedUser, type ModerationAction } from "@/lib/adminApi";
+import { fetchStats, moderateUser, searchUsers, type ManagedUser, type ModerationAction } from "@/lib/adminApi";
 import { AdminButton, EmptyState, Field, Panel, useAsyncData } from "../ui";
 
 const TIMEOUTS = [
@@ -83,7 +83,7 @@ function QuickModerate() {
     let cancelled = false;
     setSearching(true);
     const timeoutId = window.setTimeout(() => {
-      fetchUsers({ q: query, limit: 8, status: "all" })
+      searchUsers(query, 8)
         .then((users) => {
           if (cancelled) return;
           setMatches(users);
