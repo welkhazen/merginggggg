@@ -106,7 +106,9 @@ function useAudio(enabled: boolean) {
           await res.arrayBuffer(),
         );
         readyRef.current = true;
-      } catch {}
+      } catch {
+        readyRef.current = false;
+      }
     };
     init();
     return () => {
