@@ -44,6 +44,7 @@ export function FlagsTab() {
           <Row key={flag.id}>
             <div className="min-w-0 flex-1">
               <p className="flex flex-wrap items-center gap-2 text-xs text-raw-silver/55">
+                <span className="font-semibold text-raw-text">{flag.senderName ?? flag.senderId ?? "unknown user"}</span>
                 {flag.matchedWord && <Tag tone="red">{flag.matchedWord}</Tag>}
                 {flag.verdict && <Tag tone="gold">{flag.verdict}</Tag>}
                 {typeof flag.aiScore === "number" && <Tag tone="teal">AI {Math.round(flag.aiScore * 100)}%</Tag>}

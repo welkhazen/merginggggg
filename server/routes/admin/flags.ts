@@ -42,12 +42,26 @@ flagsRouter.get("/flags", async (req, res) => {
   if (parsed.data.reviewed !== "all") params.reviewed = `eq.${parsed.data.reviewed}`;
 
   const rows = await selectRows<FlagRow>("moderation_flags", params);
+
+  // Resolve sender_id -> username so the panel shows who wrote the flagged
+  // message, not an opaque UUID.
+  const senderIds = [...new Set(rows.map((row) => row.sender_id).filter((id): id is string => !!id))];
+  const nameById = new Map<string, string>();
+  if (senderIds.length > 0) {
+    const users = await selectRows<{ id: string; username: string | null }>("users", {
+      select: "id,username",
+      id: `in.(${senderIds.join(",")})`,
+    });
+    for (const user of users) if (user.username) nameById.set(user.id, user.username);
+  }
+
   return res.status(200).json({
     flags: rows.map((row) => ({
       id: row.id,
       messageId: row.message_id,
       communityId: row.community_id,
       senderId: row.sender_id,
+      senderName: row.sender_id ? nameById.get(row.sender_id) ?? null : null,
       matchedWord: row.matched_word,
       reason: row.reason,
       verdict: row.verdict,
