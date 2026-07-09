@@ -46,8 +46,9 @@ export function StaffTab({ currentUser }: { currentUser: AdminUser }) {
 function StaffRow({ member, currentUser, onChanged }: { member: StaffMember; currentUser: AdminUser; onChanged: () => void }) {
   const [pending, setPending] = useState(false);
   const isSelf = member.id === currentUser.id;
-  const canManage =
+  const canManageTier =
     !isSelf && member.tier !== null && TIER_RANK[member.tier] < TIER_RANK[currentUser.tier];
+  const canRemoveAccount = !isSelf && member.tier !== null && tierAtLeast(currentUser.tier, "owner");
 
   const assignableTiers = STAFF_TIERS.filter((tier) => {
     if (TIER_RANK[tier] > TIER_RANK[currentUser.tier]) return false;
@@ -103,19 +104,24 @@ function StaffRow({ member, currentUser, onChanged }: { member: StaffMember; cur
           Created {formatDate(member.createdAt)} · Last seen {formatDate(member.lastSeenAt)}
         </p>
       </div>
-      {canManage && (
+      {(canManageTier || canRemoveAccount) && (
         <div className="flex flex-wrap gap-2">
-          {assignableTiers.map((tier) => (
-            <AdminButton key={tier} tone="outline" disabled={pending} onClick={() => void setTier(tier)}>
-              Make {TIER_LABELS[tier]}
+          {canManageTier &&
+            assignableTiers.map((tier) => (
+              <AdminButton key={tier} tone="outline" disabled={pending} onClick={() => void setTier(tier)}>
+                Make {TIER_LABELS[tier]}
+              </AdminButton>
+            ))}
+          {canManageTier && (
+            <AdminButton tone="danger" disabled={pending} onClick={() => void setTier(null)}>
+              Revoke staff
             </AdminButton>
-          ))}
-          <AdminButton tone="danger" disabled={pending} onClick={() => void setTier(null)}>
-            Revoke staff
-          </AdminButton>
-          <AdminButton tone="danger" disabled={pending} onClick={() => void removeAccount()}>
-            <Trash2 className="h-4 w-4" /> Remove account
-          </AdminButton>
+          )}
+          {canRemoveAccount && (
+            <AdminButton tone="danger" disabled={pending} onClick={() => void removeAccount()}>
+              <Trash2 className="h-4 w-4" /> Remove account
+            </AdminButton>
+          )}
         </div>
       )}
     </Row>

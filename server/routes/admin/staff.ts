@@ -42,6 +42,10 @@ function canManageTarget(actorTier: StaffTier, targetTier: StaffTier | null): bo
   return Boolean(targetTier && TIER_RANK[targetTier] < TIER_RANK[actorTier]);
 }
 
+function canRemoveStaffAccount(actorTier: StaffTier, targetTier: StaffTier | null): boolean {
+  return Boolean(targetTier && TIER_RANK[actorTier] >= TIER_RANK.owner);
+}
+
 export const staffRouter = Router();
 
 staffRouter.get("/staff", async (_req, res) => {
@@ -176,8 +180,8 @@ staffRouter.delete("/staff/:userId", async (req, res) => {
   if (!target) return res.status(404).json({ error: "user_not_found" });
 
   const targetTier = resolveTier(target);
-  if (!canManageTarget(session.tier, targetTier)) {
-    return res.status(403).json({ error: "cannot_remove_equal_or_higher_tier" });
+  if (!canRemoveStaffAccount(session.tier, targetTier)) {
+    return res.status(403).json({ error: "cannot_remove_staff_account" });
   }
 
   await deleteRows("users", { id: `eq.${target.id}` });
