@@ -15,7 +15,8 @@
     "typecheck:server": "tsc -p tsconfig.server.json",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "secrets:scan": "node scripts/scan-secrets.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
