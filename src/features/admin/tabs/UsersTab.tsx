@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Ban, RefreshCw, Search, ShieldCheck, Trash2, TriangleAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
 import {
   fetchAppeals,
@@ -35,8 +36,19 @@ export function UsersTab() {
     }
   }
 
-  async function removeUser(user: ManagedUser) {
-    if (!window.confirm(`Permanently delete @${user.username}? This cannot be undone.`)) return;
+  function removeUser(user: ManagedUser) {
+    toast({
+      title: `Delete @${user.username}?`,
+      description: "This permanently removes the account and cannot be undone.",
+      action: (
+        <ToastAction altText={`Delete @${user.username}`} onClick={() => void confirmRemoveUser(user)}>
+          Delete
+        </ToastAction>
+      ),
+    });
+  }
+
+  async function confirmRemoveUser(user: ManagedUser) {
     try {
       await deleteUser(user.id);
       captureAdminEvent("admin_user_deleted", { target_username: user.username });
