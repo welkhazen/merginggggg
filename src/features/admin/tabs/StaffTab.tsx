@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { RefreshCw, UserPlus } from "lucide-react";
+import { RefreshCw, Trash2, UserPlus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
 import {
   createStaffAccount,
   fetchStaff,
+  removeStaffAccount,
   STAFF_TIERS,
   TIER_LABELS,
   TIER_RANK,
@@ -54,6 +55,26 @@ function StaffRow({ member, currentUser, onChanged }: { member: StaffMember; cur
     return tier !== member.tier;
   });
 
+  async function removeAccount() {
+    const confirmed = window.confirm(
+      `Remove @${member.username} from the dashboard entirely? This deletes the staff login account.`,
+    );
+    if (!confirmed) return;
+
+    setPending(true);
+    try {
+      await removeStaffAccount(member.id);
+      captureAdminEvent("admin_staff_account_removed", { tier: member.tier });
+      toast({ title: `@${member.username} staff account removed` });
+      onChanged();
+    } catch (error) {
+      captureAdminException(error, { action: "admin_staff_account_remove", tier: member.tier });
+      toast({ title: "Could not remove staff account", description: error instanceof Error ? error.message : undefined });
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function setTier(tier: StaffTier | null) {
     setPending(true);
     try {
@@ -91,6 +112,9 @@ function StaffRow({ member, currentUser, onChanged }: { member: StaffMember; cur
           ))}
           <AdminButton tone="danger" disabled={pending} onClick={() => void setTier(null)}>
             Revoke staff
+          </AdminButton>
+          <AdminButton tone="danger" disabled={pending} onClick={() => void removeAccount()}>
+            <Trash2 className="h-4 w-4" /> Remove account
           </AdminButton>
         </div>
       )}
