@@ -191,7 +191,7 @@ communitiesRouter.post("/communities/:id/messages", async (req, res) => {
     sender_id: session.userId,
     sender_name: session.username,
     text: parsed.data.text,
-    moderation_status: null,
+    moderation_status: "staff_reply",
     reply_to_sender_name: replyTo?.sender_name ?? null,
     reply_to_text: replyTo?.text ?? null,
   });
