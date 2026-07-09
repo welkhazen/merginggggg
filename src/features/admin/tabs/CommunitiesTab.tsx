@@ -1,7 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Lock, LockOpen, MessageSquareReply, RefreshCw, Search, Send, Trash2, Users, X } from "lucide-react";
+import { Ban, ChevronDown, Clock, Lock, LockOpen, MessageSquareReply, MoreVertical, RefreshCw, Search, Send, Trash2, Users, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
 import { isCommunityRealtimeConfigured, subscribeToCommunityMessages, unsubscribeFromCommunityMessages } from "@/lib/communityRealtime";
 import {
@@ -10,6 +17,7 @@ import {
   fetchCommunities,
   fetchCommunityMembers,
   fetchCommunityMessages,
+  moderateUser,
   sendCommunityMessage,
   updateCommunity,
   type CommunityMessage,
@@ -291,6 +299,26 @@ function CommunityInspector({ community }: { community: CommunitySummary }) {
     }
   }
 
+  async function moderateSender(message: CommunityMessage, action: "ban" | "timeout", minutes?: number) {
+    const username = message.senderName;
+    if (!username) {
+      toast({ title: "Unknown sender" });
+      return;
+    }
+    try {
+      await moderateUser(username, action, minutes);
+      captureAdminEvent("admin_user_moderated", { action, minutes, target_username: username });
+      toast({
+        title: action === "ban" ? `@${username} banned` : `@${username} timed out`,
+        description: action === "timeout" && minutes ? `${minutes} minutes` : undefined,
+      });
+      reloadMessages();
+    } catch (error) {
+      captureAdminException(error, { action: "admin_message_moderate_sender" });
+      toast({ title: "Could not moderate user", description: error instanceof Error ? error.message : undefined });
+    }
+  }
+
   async function sendMessage(event: React.FormEvent) {
     event.preventDefault();
     const text = draft.trim();
@@ -436,6 +464,37 @@ function CommunityInspector({ community }: { community: CommunitySummary }) {
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#ded8cb] bg-white text-[#7c766d] hover:border-red-300 hover:text-red-600"
+                                aria-label={`Moderate @${message.senderName ?? "user"}`}
+                              >
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>@{message.senderName ?? "unknown"}</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => void moderateSender(message, "timeout", 10)}>
+                                <Clock className="mr-2 h-3.5 w-3.5" /> Timeout 10 min
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => void moderateSender(message, "timeout", 60)}>
+                                <Clock className="mr-2 h-3.5 w-3.5" /> Timeout 1 hour
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => void moderateSender(message, "timeout", 60 * 24)}>
+                                <Clock className="mr-2 h-3.5 w-3.5" /> Timeout 24 hours
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600"
+                                onClick={() => void moderateSender(message, "ban")}
+                              >
+                                <Ban className="mr-2 h-3.5 w-3.5" /> Ban user
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       )}
                     </article>
