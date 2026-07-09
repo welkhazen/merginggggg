@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Lock, LockOpen, MessageSquareReply, RefreshCw, Search, Send, Trash2, Users, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { captureAdminEvent, captureAdminException } from "@/lib/analytics";
 import { isCommunityRealtimeConfigured, subscribeToCommunityMessages, unsubscribeFromCommunityMessages } from "@/lib/communityRealtime";
 import {
+  deleteCommunity,
   deleteCommunityMessage,
   fetchCommunities,
   fetchCommunityMembers,
@@ -35,6 +37,7 @@ export function CommunitiesTab() {
   const { data: communities, loading, reload } = useAsyncData(fetchCommunities);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [savingLockId, setSavingLockId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sectionsOpen, setSectionsOpen] = useState({ unlocked: true, locked: true });
 
   const selected = communities?.find((community) => community.id === selectedId) ?? null;
@@ -60,6 +63,35 @@ export function CommunitiesTab() {
       toast({ title: community.locked ? "Could not unlock room" : "Could not lock room" });
     } finally {
       setSavingLockId(null);
+    }
+  }
+
+  function requestDelete(community: CommunitySummary) {
+    toast({
+      title: `Delete ${community.title}?`,
+      description: "This permanently removes the room and its messages. This cannot be undone.",
+      action: (
+        <ToastAction altText={`Delete ${community.title}`} onClick={() => void confirmDelete(community)}>
+          Delete
+        </ToastAction>
+      ),
+    });
+  }
+
+  async function confirmDelete(community: CommunitySummary) {
+    if (deletingId) return;
+    setDeletingId(community.id);
+    try {
+      await deleteCommunity(community.id);
+      captureAdminEvent("admin_community_deleted", { community_id: community.id });
+      toast({ title: "Room deleted", description: community.title });
+      if (selectedId === community.id) setSelectedId(null);
+      reload();
+    } catch (error) {
+      captureAdminException(error, { action: "admin_community_delete" });
+      toast({ title: "Could not delete room", description: error instanceof Error ? error.message : undefined });
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -126,6 +158,15 @@ export function CommunitiesTab() {
                             <AdminButton tone={community.locked ? "teal" : "danger"} disabled={savingLock} onClick={() => void toggleLock(community)}>
                               {community.locked ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                               {savingLock ? "Saving" : community.locked ? "Unlock" : "Lock"}
+                            </AdminButton>
+                            <AdminButton
+                              tone="danger"
+                              disabled={deletingId === community.id}
+                              onClick={() => requestDelete(community)}
+                              aria-label={`Delete ${community.title}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              {deletingId === community.id ? "Deleting" : "Delete"}
                             </AdminButton>
                           </div>
                         </Row>
