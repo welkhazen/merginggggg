@@ -36,6 +36,8 @@ and `SESSION_SECRET` in the Vercel project; see `.env.example` for the optional 
 
 Database migrations live in `supabase/migrations/`.
 
+If any backend or vendor credentials may be exposed, follow `SECURITY_ROTATION.md` before shipping more changes.
+
 ---
 
 # Welcome to your Lovable project
