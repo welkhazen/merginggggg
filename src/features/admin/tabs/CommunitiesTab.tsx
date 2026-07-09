@@ -33,11 +33,26 @@ function formatChatTime(value: string): string {
 
 export function CommunitiesTab() {
   const { data: communities, loading, reload } = useAsyncData(fetchCommunities);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const MAX_INSPECTED = 3;
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [savingLockId, setSavingLockId] = useState<string | null>(null);
   const [sectionsOpen, setSectionsOpen] = useState({ unlocked: true, locked: true });
 
-  const selected = communities?.find((community) => community.id === selectedId) ?? null;
+  function toggleInspect(id: string) {
+    setSelectedIds((current) => {
+      if (current.includes(id)) return current.filter((existing) => existing !== id);
+      if (current.length >= MAX_INSPECTED) {
+        toast({ title: `You can inspect up to ${MAX_INSPECTED} rooms at once` });
+        return current;
+      }
+      return [...current, id];
+    });
+  }
+
+  // Preserve the order rooms were opened in.
+  const selectedCommunities = selectedIds
+    .map((id) => communities?.find((community) => community.id === id))
+    .filter((community): community is CommunitySummary => Boolean(community));
   const groupedCommunities = useMemo(() => {
     const list = communities ?? [];
     return {
@@ -120,8 +135,8 @@ export function CommunitiesTab() {
                             </p>
                           </div>
                           <div className="flex gap-2">
-                            <AdminButton tone="outline" onClick={() => setSelectedId(selectedId === community.id ? null : community.id)}>
-                              {selectedId === community.id ? "Close" : "Inspect"}
+                            <AdminButton tone="outline" onClick={() => toggleInspect(community.id)}>
+                              {selectedIds.includes(community.id) ? "Close" : "Inspect"}
                             </AdminButton>
                             <AdminButton tone={community.locked ? "teal" : "danger"} disabled={savingLock} onClick={() => void toggleLock(community)}>
                               {community.locked ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
@@ -138,7 +153,15 @@ export function CommunitiesTab() {
           })}
         </div>
       </Panel>
-      {selected && <CommunityInspector community={selected} />}
+      {selectedCommunities.length > 0 && (
+        <div className={`grid gap-4 ${selectedCommunities.length === 1 ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3"}`}>
+          {selectedCommunities.map((community) => (
+            <div key={community.id} className="min-w-0">
+              <CommunityInspector community={community} />
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
