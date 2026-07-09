@@ -152,7 +152,15 @@ commerceRouter.get("/token-requests", async (req, res) => {
     limit: 100,
   };
   const statusFilter = tokenRequestStatusFilter(status);
-  if (statusFilter) params.status = statusFilter;
+  if (statusFilter) {
+    params.status = statusFilter;
+  } else {
+    // Default ("all") view: keep every pending request, but drop resolved
+    // (approved/rejected/etc.) requests once they are more than a day old, so
+    // the dashboard queue doesn't accumulate stale history.
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    params.or = `(status.in.(pending,new),created_at.gte.${cutoff})`;
+  }
 
   let rows: Array<TokenRequestRow | TokenRequestRowWithoutTokens>;
   try {
