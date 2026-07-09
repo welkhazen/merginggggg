@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { writeAudit } from "../../lib/audit.js";
-import { insertRow, rpc, selectRows, updateRows } from "../../lib/supabaseAdmin.js";
+import { deleteRows, insertRow, rpc, selectRows, updateRows } from "../../lib/supabaseAdmin.js";
 import { adminSession } from "../../middleware/adminAuth.js";
 
 type CommunityRow = {
@@ -121,6 +121,29 @@ communitiesRouter.patch("/communities/:id", async (req, res) => {
     targetId: req.params.id,
     targetLabel: rows[0].title,
     details: updates as Record<string, unknown>,
+  });
+  return res.status(200).json({ ok: true });
+});
+
+communitiesRouter.delete("/communities/:id", async (req, res) => {
+  const session = adminSession(res);
+  const rows = await selectRows<CommunityRow>("communities", {
+    select: "id,title",
+    id: `eq.${req.params.id}`,
+    limit: 1,
+  });
+  const community = rows[0];
+  if (!community) return res.status(404).json({ error: "community_not_found" });
+
+  // community_messages and community_members reference communities with
+  // ON DELETE CASCADE, so removing the community row removes its chat too.
+  await deleteRows("communities", { id: `eq.${req.params.id}` });
+
+  await writeAudit(session, {
+    action: "community_deleted",
+    targetType: "community",
+    targetId: community.id,
+    targetLabel: community.title,
   });
   return res.status(200).json({ ok: true });
 });
