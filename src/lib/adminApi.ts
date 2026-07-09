@@ -660,6 +660,12 @@ export async function updateStaffTier(userId: string, tier: StaffTier | null): P
   });
 }
 
+export async function removeStaffAccount(userId: string): Promise<void> {
+  await jsonRequest<{ ok: true }>(`/api/admin/staff/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
+}
+
 // --- Audit log ---
 
 export async function fetchAuditLog(options: { action?: string; actor?: string; limit?: number; offset?: number } = {}): Promise<AuditEntry[]> {

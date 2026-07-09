@@ -28,10 +28,22 @@ const tierUpdateSchema = z.object({
   tier: z.enum(STAFF_TIERS).nullable(),
 });
 
+const staffMemberParamsSchema = z.object({
+  userId: z.string().uuid(),
+});
+
 function canAssign(actorTier: StaffTier, tier: StaffTier): boolean {
   // Only super admins can mint owners or other super admins.
   if (TIER_RANK[tier] >= TIER_RANK.owner) return actorTier === "super_admin";
   return true;
+}
+
+function canManageTarget(actorTier: StaffTier, targetTier: StaffTier | null): boolean {
+  return Boolean(targetTier && TIER_RANK[targetTier] < TIER_RANK[actorTier]);
+}
+
+function canRemoveStaffAccount(actorTier: StaffTier, targetTier: StaffTier | null): boolean {
+  return Boolean(targetTier && TIER_RANK[actorTier] >= TIER_RANK.owner);
 }
 
 export const staffRouter = Router();
@@ -119,7 +131,7 @@ staffRouter.patch("/staff/tier", async (req, res) => {
   if (!target) return res.status(404).json({ error: "user_not_found" });
 
   const targetTier = resolveTier(target);
-  if (targetTier && TIER_RANK[targetTier] >= TIER_RANK[session.tier]) {
+  if (!canManageTarget(session.tier, targetTier)) {
     return res.status(403).json({ error: "cannot_modify_equal_or_higher_tier" });
   }
   if (parsed.data.tier && !canAssign(session.tier, parsed.data.tier)) {
@@ -146,6 +158,43 @@ staffRouter.patch("/staff/tier", async (req, res) => {
   });
   captureServerEvent(req, "admin_staff_tier_changed_server", getPostHogDistinctId(req, session.userId), {
     to: parsed.data.tier,
+  });
+  return res.status(200).json({ ok: true });
+});
+
+staffRouter.delete("/staff/:userId", async (req, res) => {
+  const parsed = staffMemberParamsSchema.safeParse(req.params);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
+
+  const session = adminSession(res);
+  if (parsed.data.userId === session.userId) {
+    return res.status(403).json({ error: "cannot_remove_own_account" });
+  }
+
+  const rows = await selectRows<DbUser>("users", {
+    select: "id,username,role,staff_tier,status,created_at,last_seen_at",
+    id: `eq.${parsed.data.userId}`,
+    limit: 1,
+  });
+  const target = rows[0];
+  if (!target) return res.status(404).json({ error: "user_not_found" });
+
+  const targetTier = resolveTier(target);
+  if (!canRemoveStaffAccount(session.tier, targetTier)) {
+    return res.status(403).json({ error: "cannot_remove_staff_account" });
+  }
+
+  await deleteRows("users", { id: `eq.${target.id}` });
+
+  await writeAudit(session, {
+    action: "staff_account_removed",
+    targetType: "user",
+    targetId: target.id,
+    targetLabel: target.username,
+    details: { tier: targetTier },
+  });
+  captureServerEvent(req, "admin_staff_account_removed_server", getPostHogDistinctId(req, session.userId), {
+    tier: targetTier,
   });
   return res.status(200).json({ ok: true });
 });
