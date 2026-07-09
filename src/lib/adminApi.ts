@@ -389,6 +389,12 @@ export async function updateCommunity(id: string, updates: { locked?: boolean; s
   });
 }
 
+export async function deleteCommunity(id: string): Promise<void> {
+  await jsonRequest<{ ok: true }>(`/api/admin/communities/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchCommunityMessages(
   id: string,
   filter: "all" | "deleted" | "flagged" = "all",
