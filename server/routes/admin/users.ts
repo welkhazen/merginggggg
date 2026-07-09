@@ -185,7 +185,29 @@ usersRouter.delete("/users/:id", requireTier("admin"), async (req, res) => {
     return res.status(403).json({ error: "cannot_delete_staff" });
   }
 
-  await deleteRows("users", { id: `eq.${target.id}` });
+  // Full wipe: remove every row referencing this user before deleting the
+  // account itself. Failures on any one table are logged but don't block the
+  // account deletion (best-effort purge of auxiliary data).
+  const userId = target.id;
+  const relatedDeletes: Array<[string, Record<string, string>]> = [
+    ["community_messages", { sender_id: `eq.${userId}` }],
+    ["community_members", { user_id: `eq.${userId}` }],
+    ["token_requests", { user_id: `eq.${userId}` }],
+    ["appeals", { user_id: `eq.${userId}` }],
+    ["moderation_flags", { sender_id: `eq.${userId}` }],
+    ["moderation_actions", { or: `(target_user_id.eq.${userId},actor_id.eq.${userId})` }],
+    ["chat_reports", { or: `(reporter_id.eq.${userId},reported_user_id.eq.${userId})` }],
+    ["founding_invites", { inviter_id: `eq.${userId}` }],
+    ["founding_invite_redemptions", { or: `(inviter_id.eq.${userId},redeemed_by.eq.${userId})` }],
+    ["admin_audit_log", { actor_id: `eq.${userId}` }],
+  ];
+  for (const [table, filter] of relatedDeletes) {
+    await deleteRows(table, filter).catch((error) =>
+      console.error(`[user-delete] failed to purge ${table} for ${userId}`, error),
+    );
+  }
+
+  await deleteRows("users", { id: `eq.${userId}` });
   await writeAudit(session, {
     action: "user_deleted",
     targetType: "user",
