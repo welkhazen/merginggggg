@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Ban, ChevronDown, Clock, Lock, LockOpen, MessageSquareReply, MoreVertical, RefreshCw, Search, Send, Trash2, Users, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
