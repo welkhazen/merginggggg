@@ -1,8 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
 import type { StaffTier } from "../lib/roles.js";
-import { resolveTier, tierAtLeast } from "../lib/roles.js";
+import { tierAtLeast } from "../lib/roles.js";
 import type { AdminSession } from "../lib/sessionToken.js";
 import { SESSION_COOKIE, verifySessionToken } from "../lib/sessionToken.js";
+import { resolveSyncedTier } from "../lib/staffTierSync.js";
 import { selectRows } from "../lib/supabaseAdmin.js";
 
 export function getAdminSession(req: Request): AdminSession | null {
@@ -14,6 +15,7 @@ export function getAdminSession(req: Request): AdminSession | null {
 // database so bans and demotions apply immediately, not at cookie expiry.
 // The fresh session is cached on res.locals because chained tier gates can
 // run several times for one request.
+
 async function loadFreshSession(req: Request, res: Response): Promise<AdminSession | null> {
   const cached = res.locals.freshAdminSession as AdminSession | null | undefined;
   if (cached !== undefined) return cached;
@@ -29,7 +31,7 @@ async function loadFreshSession(req: Request, res: Response): Promise<AdminSessi
     { select: "id,username,role,status,staff_tier", id: `eq.${cookieSession.userId}`, limit: 1 },
   );
   const user = rows[0];
-  const tier = user ? resolveTier(user) : null;
+  const tier = user ? await resolveSyncedTier(cookieSession.tier, user) : null;
   const fresh: AdminSession | null =
     !user || user.status === "banned" || !tier
       ? null
