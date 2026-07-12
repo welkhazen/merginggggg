@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { writeAudit } from "../../lib/audit.js";
-import { isPostHogQueryConfigured } from "../../lib/posthogQuery.js";
+import { isPostHogQueryConfigured, posthogConfigDetail } from "../../lib/posthogQuery.js";
 import { isCrashAlertEnabled } from "../../lib/resend.js";
 import {
   fetchSupabaseAdvisors,
@@ -47,6 +47,9 @@ systemRouter.get("/system/status", (_req, res) => {
       resendCrashAlerts: isCrashAlertEnabled,
       posthogQuery: isPostHogQueryConfigured,
     },
+    // Which PostHog vars the server actually sees (presence only, never
+    // values) so a misconfigured deployment is diagnosable from the portal.
+    posthogConfig: posthogConfigDetail,
     supabaseProjectRef,
   });
 });
