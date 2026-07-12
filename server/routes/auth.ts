@@ -5,6 +5,7 @@ import { z } from "zod";
 import { captureServerEvent, getPostHogDistinctId } from "../lib/analytics.js";
 import type { StaffTier } from "../lib/roles.js";
 import { resolveTier } from "../lib/roles.js";
+import { resolveSyncedTier } from "../lib/staffTierSync.js";
 import { clearSessionCookie, setSessionCookie } from "../lib/sessionToken.js";
 import { SupabaseAdminError, rpc, selectRows } from "../lib/supabaseAdmin.js";
 import { getAdminSession } from "../middleware/adminAuth.js";
@@ -115,7 +116,7 @@ authRouter.get("/me", async (req, res) => {
   try {
     // Re-fetch so bans and tier changes take effect on the next request.
     const user = await findUserById(session.userId);
-    const tier = user ? resolveTier(user) : null;
+    const tier = user ? await resolveSyncedTier(session.tier, user) : null;
     if (!user || user.status === "banned" || !tier) {
       clearSessionCookie(res);
       return res.status(401).json({ error: "Not authenticated." });
