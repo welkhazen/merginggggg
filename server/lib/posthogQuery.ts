@@ -2,6 +2,13 @@ import { env } from "../config/env.js";
 
 export const isPostHogQueryConfigured = Boolean(env.POSTHOG_PERSONAL_API_KEY && env.POSTHOG_PROJECT_ID);
 
+// Per-variable presence (booleans only, never values) so the System tab can
+// show an operator exactly which PostHog var is still missing on the server.
+export const posthogConfigDetail = {
+  personalApiKey: Boolean(env.POSTHOG_PERSONAL_API_KEY),
+  projectId: Boolean(env.POSTHOG_PROJECT_ID),
+};
+
 // Private API lives on the app host (us.posthog.com), not the ingestion host
 // (us.i.posthog.com) used by the client SDK.
 function privateApiHost(): string {
