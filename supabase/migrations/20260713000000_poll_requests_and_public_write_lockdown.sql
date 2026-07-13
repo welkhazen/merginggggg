@@ -37,13 +37,14 @@ create index if not exists poll_requests_status_idx
 
 alter table public.poll_requests enable row level security;
 
--- The public may only submit a *pending* request (can't self-approve).
+-- The public may only submit a *pending* request (can't self-approve, and
+-- can't spoof the reviewer fields the admin route stamps on approval).
 drop policy if exists "Anyone can request a poll" on public.poll_requests;
 create policy "Anyone can request a poll"
   on public.poll_requests
   for insert
   to anon, authenticated
-  with check (status = 'pending');
+  with check (status = 'pending' and reviewed_at is null and reviewed_by is null);
 
 -- Safety net for a truly authenticated admin session (the portal itself uses
 -- the service role and bypasses RLS, so these only matter for direct API use).

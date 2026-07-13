@@ -1,7 +1,8 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { writeAudit } from "../../lib/audit.js";
-import { insertRow, insertRows, selectRows, updateRows } from "../../lib/supabaseAdmin.js";
+import { insertRow, insertRows, selectRows, SupabaseAdminError, updateRows } from "../../lib/supabaseAdmin.js";
 import { adminSession, requireTier } from "../../middleware/adminAuth.js";
 
 type PollRequestRow = {
@@ -28,6 +29,15 @@ const reviewSchema = z.object({
 const SELECT =
   "id,requester_id,requester_name,question,options,note,submitted_at,status,reviewed_at,reviewed_by";
 
+// These handlers touch the database; rate-limit them so a client can't hammer
+// the review endpoints (mirrors the limiter on the auth routes).
+const pollRequestsLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Options are stored as a jsonb array of label strings; be defensive about shape.
 function readOptionLabels(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -50,36 +60,45 @@ function slugify(value: string): string {
   );
 }
 
+// Insert the poll, retrying on a primary-key conflict with the next numbered
+// slug. Retrying (rather than a pre-flight "which ids are taken" query) keeps id
+// allocation safe against concurrent approvals -- the DB is the arbiter.
 async function createPollFromRequest(request: PollRequestRow): Promise<string> {
   const base = slugify(request.question);
-  const taken = new Set(
-    (await selectRows<{ id: string }>("polls", { select: "id", id: `like.${base}*`, limit: 100 })).map((r) => r.id),
-  );
-  let id = base;
-  for (let i = 2; taken.has(id); i += 1) id = `${base}-${i}`;
-
-  await insertRow<{ id: string }>("polls", {
-    id,
-    question: request.question,
-    status: "active",
-    is_onboarding: false,
-  });
-
   const labels = readOptionLabels(request.options);
-  if (labels.length > 0) {
-    await insertRows("poll_options", labels.map((label, i) => ({
-      id: `${id}-opt-${i + 1}`,
-      poll_id: id,
-      label,
-      position: i,
-    })));
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const id = attempt === 0 ? base : `${base}-${attempt + 1}`;
+    try {
+      await insertRow<{ id: string }>("polls", {
+        id,
+        question: request.question,
+        status: "active",
+        is_onboarding: false,
+      });
+    } catch (error) {
+      // 409 = id already taken; try the next numbered slug.
+      if (error instanceof SupabaseAdminError && error.status === 409) continue;
+      throw error;
+    }
+
+    if (labels.length > 0) {
+      await insertRows("poll_options", labels.map((label, i) => ({
+        id: `${id}-opt-${i + 1}`,
+        poll_id: id,
+        label,
+        position: i,
+      })));
+    }
+    return id;
   }
-  return id;
+
+  throw new Error("could not allocate a unique poll id");
 }
 
 export const pollRequestsRouter = Router();
 
-pollRequestsRouter.get("/poll-requests", requireTier("moderator"), async (req, res) => {
+pollRequestsRouter.get("/poll-requests", requireTier("moderator"), pollRequestsLimiter, async (req, res) => {
   const parsed = requestsQuerySchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: "invalid_query" });
 
@@ -107,7 +126,7 @@ pollRequestsRouter.get("/poll-requests", requireTier("moderator"), async (req, r
   });
 });
 
-pollRequestsRouter.patch("/poll-requests/:id", requireTier("admin"), async (req, res) => {
+pollRequestsRouter.patch("/poll-requests/:id", requireTier("admin"), pollRequestsLimiter, async (req, res) => {
   const parsed = reviewSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
 
@@ -123,6 +142,14 @@ pollRequestsRouter.patch("/poll-requests/:id", requireTier("admin"), async (req,
   const existing = existingRows[0];
   if (!existing) return res.status(404).json({ error: "request_not_found" });
 
+  // Create the poll BEFORE persisting the approved status. If creation fails the
+  // request stays 'pending' and can be retried; the reverse would strand the
+  // request as 'approved' with no backing poll and no way back to 'pending'.
+  let createdPollId: string | null = null;
+  if (parsed.data.status === "approved" && existing.status !== "approved") {
+    createdPollId = await createPollFromRequest(existing);
+  }
+
   const rows = await updateRows<PollRequestRow>(
     "poll_requests",
     { id: `eq.${req.params.id}` },
@@ -130,17 +157,17 @@ pollRequestsRouter.patch("/poll-requests/:id", requireTier("admin"), async (req,
   );
   if (rows.length === 0) return res.status(404).json({ error: "request_not_found" });
 
-  let createdPollId: string | null = null;
-  if (parsed.data.status === "approved" && existing.status !== "approved") {
-    createdPollId = await createPollFromRequest(existing);
+  // A failed audit write shouldn't mask an otherwise-successful review.
+  try {
+    await writeAudit(session, {
+      action: "poll_request_reviewed",
+      targetType: "poll_request",
+      targetId: String(req.params.id),
+      targetLabel: existing.question,
+      details: { status: parsed.data.status, createdPollId },
+    });
+  } catch (error) {
+    console.error("[pollRequests] failed to write audit entry", error);
   }
-
-  await writeAudit(session, {
-    action: "poll_request_reviewed",
-    targetType: "poll_request",
-    targetId: String(req.params.id),
-    targetLabel: existing.question,
-    details: { status: parsed.data.status, createdPollId },
-  });
   return res.status(200).json({ ok: true, pollId: createdPollId });
 });
