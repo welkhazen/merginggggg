@@ -26,6 +26,12 @@ const reviewSchema = z.object({
   status: z.enum(["approved", "rejected"]),
 });
 
+// Validate the path id as a UUID before it flows into a PostgREST query URL, so
+// untrusted input can't inject extra query parameters into the outbound request.
+const paramsSchema = z.object({
+  id: z.string().uuid(),
+});
+
 const SELECT =
   "id,requester_id,requester_name,question,options,note,submitted_at,status,reviewed_at,reviewed_by";
 
@@ -127,6 +133,10 @@ pollRequestsRouter.get("/poll-requests", requireTier("moderator"), pollRequestsL
 });
 
 pollRequestsRouter.patch("/poll-requests/:id", requireTier("admin"), pollRequestsLimiter, async (req, res) => {
+  const parsedParams = paramsSchema.safeParse(req.params);
+  if (!parsedParams.success) return res.status(400).json({ error: "invalid_id" });
+  const requestId = parsedParams.data.id;
+
   const parsed = reviewSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload" });
 
@@ -136,7 +146,7 @@ pollRequestsRouter.patch("/poll-requests/:id", requireTier("admin"), pollRequest
   // duplicate poll (matches the community_requests flow).
   const existingRows = await selectRows<PollRequestRow>("poll_requests", {
     select: SELECT,
-    id: `eq.${req.params.id}`,
+    id: `eq.${requestId}`,
     limit: 1,
   });
   const existing = existingRows[0];
@@ -152,7 +162,7 @@ pollRequestsRouter.patch("/poll-requests/:id", requireTier("admin"), pollRequest
 
   const rows = await updateRows<PollRequestRow>(
     "poll_requests",
-    { id: `eq.${req.params.id}` },
+    { id: `eq.${requestId}` },
     { status: parsed.data.status, reviewed_at: new Date().toISOString(), reviewed_by: session.username },
   );
   if (rows.length === 0) return res.status(404).json({ error: "request_not_found" });
@@ -162,7 +172,7 @@ pollRequestsRouter.patch("/poll-requests/:id", requireTier("admin"), pollRequest
     await writeAudit(session, {
       action: "poll_request_reviewed",
       targetType: "poll_request",
-      targetId: String(req.params.id),
+      targetId: requestId,
       targetLabel: existing.question,
       details: { status: parsed.data.status, createdPollId },
     });
