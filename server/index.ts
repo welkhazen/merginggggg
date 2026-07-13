@@ -11,6 +11,7 @@ import { SupabaseAdminError } from "./lib/supabaseAdmin.js";
 import { adminRouter } from "./routes/admin/index.js";
 import { authRouter } from "./routes/auth.js";
 import { errorsRouter } from "./routes/errors.js";
+import { communitiesPublicRouter } from "./routes/communities.js";
 import { waitlistRouter } from "./routes/waitlist.js";
 
 const app = express();
@@ -87,6 +88,7 @@ if (configErrors.length > 0) {
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/errors", errorsRouter);
+app.use("/api/communities", communitiesPublicRouter);
 app.use("/api/waitlist", waitlistRouter);
 
 // Static SPA serving for the classic long-running deployment. On Vercel the

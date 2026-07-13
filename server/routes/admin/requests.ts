@@ -68,7 +68,7 @@ async function createCommunityFromRequest(request: CommunityRequestRow): Promise
     description,
     topic,
     status: "Active",
-    locked: false,
+    locked: true,
     created_by: request.requester_id,
   });
   return row.id;

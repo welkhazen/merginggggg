@@ -83,9 +83,7 @@ communitiesRouter.get("/communities", async (_req, res) => {
 communitiesRouter.get("/communities/open", async (_req, res) => {
   const rows = await selectRows<CommunityRow>("communities", {
     select: "id,abbr,title,topic,status,locked,created_at",
-    locked: "eq.false",
     order: "created_at.asc",
-    limit: 3,
   });
 
   return res.status(200).json({
@@ -94,8 +92,8 @@ communitiesRouter.get("/communities/open", async (_req, res) => {
       abbr: community.abbr,
       title: community.title,
       topic: community.topic,
-      status: community.status,
-      locked: Boolean(community.locked),
+      status: "Waitlist",
+      locked: true,
       createdAt: community.created_at,
       memberCount: 0,
     })),
