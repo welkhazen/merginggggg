@@ -6,6 +6,7 @@ import { commerceRouter } from "./commerce.js";
 import { communitiesRouter } from "./communities.js";
 import { flagsRouter } from "./flags.js";
 import { invitesRouter } from "./invites.js";
+import { pollRequestsRouter } from "./pollRequests.js";
 import { reportsRouter } from "./reports.js";
 import { requestsRouter } from "./requests.js";
 import { staffRouter } from "./staff.js";
@@ -18,7 +19,7 @@ export const adminRouter = Router();
 
 // Tier ladder: moderator < admin < owner < super_admin.
 // Content moderation and community request visibility are open to every staff tier.
-adminRouter.use(requireTier("moderator"), statsRouter, communitiesRouter, reportsRouter, flagsRouter, usersRouter, requestsRouter);
+adminRouter.use(requireTier("moderator"), statsRouter, communitiesRouter, reportsRouter, flagsRouter, usersRouter, requestsRouter, pollRequestsRouter);
 
 // Community programs, commerce, filters, invites, analytics: admin and up.
 adminRouter.use(requireTier("admin"), commerceRouter, wordsRouter, invitesRouter, analyticsRouter);
