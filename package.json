@@ -16,7 +16,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "secrets:scan": "node scripts/scan-secrets.mjs"
+    "secrets:scan": "node scripts/scan-secrets.mjs",
+    "github:repo-cleanup": "node scripts/github-repo-cleanup.mjs"
   },
   "dependencies": {
     "@posthog/react": "^1.10.3",
