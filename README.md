@@ -37,3 +37,21 @@ and `SESSION_SECRET` in the Vercel project; see `.env.example` for the optional 
 Database migrations live in `supabase/migrations/`.
 
 If any backend or vendor credentials may be exposed, follow `SECURITY_ROTATION.md` before shipping more changes.
+
+## GitHub repository cleanup helper
+
+Use the dry-run-first cleanup helper when consolidating GitHub repos:
+
+```sh
+GITHUB_TOKEN=ghp_... npm run github:repo-cleanup -- --owner your-github-owner --current merginggggg
+```
+
+Safety defaults:
+
+- keeps the current repo active and private;
+- makes every non-current repo private;
+- archives likely duplicate repos, plus any repos passed with `--archive repo-a,repo-b`;
+- deletes repos only when explicitly passed with `--delete repo-c`;
+- runs as a dry run unless `--apply` is provided.
+
+Recommended smoother flow: run the command once without `--apply`, review the planned actions, then run the exact same command with `--apply`. Prefer archiving over deleting unless a repo name is intentionally listed in `--delete` and you have a recent backup.
