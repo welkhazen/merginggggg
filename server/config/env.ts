@@ -52,6 +52,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   API_PORT: z.coerce.number().int().positive().default(8787),
   CORS_ORIGIN: z.string().url().default("http://localhost:8080"),
+  APP_ALLOWED_HOSTS: z.preprocess(emptyToUndefined, z.string().optional()),
   SESSION_SECRET: z.preprocess(
     emptyToUndefined,
     z.string().min(32, "SESSION_SECRET must be at least 32 characters.").default(DEFAULT_SESSION_SECRET)
@@ -107,6 +108,7 @@ export const env = parsedEnv.success
       NODE_ENV: "development" as const,
       API_PORT: 8787,
       CORS_ORIGIN: "http://localhost:8080",
+      APP_ALLOWED_HOSTS: "",
       SESSION_SECRET: DEFAULT_SESSION_SECRET,
       SUPABASE_URL: "",
       SUPABASE_SERVICE_ROLE_KEY: "",

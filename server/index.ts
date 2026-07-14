@@ -19,6 +19,14 @@ const isProduction = env.NODE_ENV === "production";
 const port = env.API_PORT;
 const corsOrigin = env.CORS_ORIGIN;
 const isVercel = Boolean(process.env.VERCEL);
+const allowedHosts = new Set(
+  (env.APP_ALLOWED_HOSTS ?? "")
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+const normalizeHost = (host: string | undefined) => host?.split(",")[0]?.trim().toLowerCase().replace(/:\d+$/, "");
 
 app.set("trust proxy", 1);
 
@@ -40,6 +48,18 @@ if (isProduction && !isVercel) {
     const forwardedProto = req.headers["x-forwarded-proto"];
     if (forwardedProto !== "https") {
       return res.status(400).json({ error: "HTTPS is required." });
+    }
+
+    return next();
+  });
+}
+
+if (isProduction && allowedHosts.size > 0) {
+  app.use("/api", (req, res, next) => {
+    const requestHost = normalizeHost(req.headers["x-forwarded-host"]?.toString() ?? req.headers.host);
+
+    if (!requestHost || !allowedHosts.has(requestHost)) {
+      return res.status(404).json({ error: "Not found." });
     }
 
     return next();
