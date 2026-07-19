@@ -10,7 +10,9 @@ import {
   updateTokenRequest,
   type TokenRequest,
 } from "@/lib/adminApi";
-import { AdminButton, EmptyState, formatDate, Panel, Row, statusTone, Tag, useAsyncData } from "../ui";
+import { AdminButton, EmptyState, Panel, Row, Tag } from "../ui";
+import { formatDate, statusTone } from "../utils";
+import { useAsyncData } from "../useAsyncData";
 
 export function CommerceTab() {
   return (
@@ -22,14 +24,27 @@ export function CommerceTab() {
 }
 
 function DonationsPanel() {
-  const { data: requests, loading, reload, setData } = useAsyncData(fetchDonationInterests);
-  const pendingCount = requests?.filter((request) => request.status === "pending").length ?? 0;
+  const {
+    data: requests,
+    loading,
+    reload,
+    setData,
+  } = useAsyncData(fetchDonationInterests);
+  const pendingCount =
+    requests?.filter((request) => request.status === "pending").length ?? 0;
 
   async function markReviewed(id: string) {
     try {
       await updateDonationInterestStatus(id, "reviewed");
       captureAdminEvent("admin_donation_interest_reviewed");
-      setData((current) => current?.map((request) => (request.id === id ? { ...request, status: "reviewed" as const } : request)) ?? null);
+      setData(
+        (current) =>
+          current?.map((request) =>
+            request.id === id
+              ? { ...request, status: "reviewed" as const }
+              : request,
+          ) ?? null,
+      );
     } catch (error) {
       captureAdminException(error, { action: "admin_donation_review" });
       toast({ title: "Could not update submission" });
@@ -40,7 +55,9 @@ function DonationsPanel() {
     try {
       await deleteDonationInterest(id);
       captureAdminEvent("admin_donation_interest_deleted");
-      setData((current) => current?.filter((request) => request.id !== id) ?? null);
+      setData(
+        (current) => current?.filter((request) => request.id !== id) ?? null,
+      );
     } catch (error) {
       captureAdminException(error, { action: "admin_donation_delete" });
       toast({ title: "Could not delete submission" });
@@ -52,28 +69,52 @@ function DonationsPanel() {
       title={`Donation interest ${pendingCount ? `(${pendingCount} pending)` : ""}`}
       hint="Review and clear donation interest submissions."
       actions={
-        <AdminButton tone="outline" disabled={loading} onClick={reload} aria-label="Refresh donations">
+        <AdminButton
+          tone="outline"
+          disabled={loading}
+          onClick={reload}
+          aria-label="Refresh donations"
+        >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
         </AdminButton>
       }
     >
-      {requests && requests.length === 0 && <EmptyState>No submissions yet.</EmptyState>}
+      {requests && requests.length === 0 && (
+        <EmptyState>No submissions yet.</EmptyState>
+      )}
       <div className="space-y-2">
         {requests?.map((request) => (
           <Row key={request.id}>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-raw-text">{request.name}</p>
-              <p className="truncate text-xs text-raw-silver/55">{request.email}</p>
-              {request.phone && <p className="text-xs text-raw-silver/60">{request.phone}</p>}
+              <p className="truncate text-sm font-semibold text-raw-text">
+                {request.name}
+              </p>
+              <p className="truncate text-xs text-raw-silver/55">
+                {request.email}
+              </p>
+              {request.phone && (
+                <p className="text-xs text-raw-silver/60">{request.phone}</p>
+              )}
               <p className="mt-1 text-[10px] text-raw-silver/35">
-                {formatDate(request.submittedAt)} · <Tag tone={statusTone(request.status)}>{request.status}</Tag>
+                {formatDate(request.submittedAt)} ·{" "}
+                <Tag tone={statusTone(request.status)}>{request.status}</Tag>
               </p>
             </div>
             <div className="flex gap-2">
               {request.status === "pending" && (
-                <AdminButton tone="teal" onClick={() => void markReviewed(request.id)}>Mark reviewed</AdminButton>
+                <AdminButton
+                  tone="teal"
+                  onClick={() => void markReviewed(request.id)}
+                >
+                  Mark reviewed
+                </AdminButton>
               )}
-              <AdminButton tone="outline" onClick={() => void remove(request.id)}>Delete</AdminButton>
+              <AdminButton
+                tone="outline"
+                onClick={() => void remove(request.id)}
+              >
+                Delete
+              </AdminButton>
             </div>
           </Row>
         ))}
@@ -83,12 +124,23 @@ function DonationsPanel() {
 }
 
 function TokenRequestsPanel() {
-  const { data: requests, loading, reload } = useAsyncData(() => fetchTokenRequests("all"));
+  const {
+    data: requests,
+    loading,
+    reload,
+  } = useAsyncData(() => fetchTokenRequests("all"));
 
-  async function review(id: string, status: "approved" | "rejected", tokenAmount?: number) {
+  async function review(
+    id: string,
+    status: "approved" | "rejected",
+    tokenAmount?: number,
+  ) {
     try {
       await updateTokenRequest(id, status, tokenAmount);
-      captureAdminEvent("admin_token_request_reviewed", { status, tokenAmount });
+      captureAdminEvent("admin_token_request_reviewed", {
+        status,
+        tokenAmount,
+      });
       toast({ title: `Token request ${status}` });
       reload();
     } catch (error) {
@@ -102,15 +154,26 @@ function TokenRequestsPanel() {
       title="Token requests"
       hint="Members asking to buy or be granted tokens."
       actions={
-        <AdminButton tone="outline" disabled={loading} onClick={reload} aria-label="Refresh token requests">
+        <AdminButton
+          tone="outline"
+          disabled={loading}
+          onClick={reload}
+          aria-label="Refresh token requests"
+        >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
         </AdminButton>
       }
     >
-      {requests && requests.length === 0 && <EmptyState>No token requests yet.</EmptyState>}
+      {requests && requests.length === 0 && (
+        <EmptyState>No token requests yet.</EmptyState>
+      )}
       <div className="space-y-2">
         {requests?.map((request) => (
-          <TokenRequestRow key={request.id} request={request} onReview={review} />
+          <TokenRequestRow
+            key={request.id}
+            request={request}
+            onReview={review}
+          />
         ))}
       </div>
     </Panel>
@@ -118,7 +181,8 @@ function TokenRequestsPanel() {
 }
 
 function requestedTokenAmount(request: TokenRequest): number {
-  if (typeof request.tokens === "number" && request.tokens > 0) return request.tokens;
+  if (typeof request.tokens === "number" && request.tokens > 0)
+    return request.tokens;
   const text = [...request.reasons, request.note ?? ""].join(" ");
   const match = text.match(/\b(\d+)\s+tokens?\b/i);
   return match ? Number(match[1]) : 1;
@@ -129,9 +193,15 @@ function TokenRequestRow({
   onReview,
 }: {
   request: TokenRequest;
-  onReview: (id: string, status: "approved" | "rejected", tokenAmount?: number) => Promise<void>;
+  onReview: (
+    id: string,
+    status: "approved" | "rejected",
+    tokenAmount?: number,
+  ) => Promise<void>;
 }) {
-  const [tokenAmount, setTokenAmount] = useState(() => requestedTokenAmount(request));
+  const [tokenAmount, setTokenAmount] = useState(() =>
+    requestedTokenAmount(request),
+  );
   const validAmount = Number.isInteger(tokenAmount) && tokenAmount > 0;
   const canReview = request.status === "pending" || request.status === "new";
 
@@ -141,12 +211,26 @@ function TokenRequestRow({
         <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-raw-text">
           @{request.username ?? "unknown"}
           <Tag tone={statusTone(request.status)}>{request.status}</Tag>
-          {typeof request.priceUsd === "number" && <Tag tone="gold">${request.priceUsd}</Tag>}
+          {typeof request.priceUsd === "number" && (
+            <Tag tone="gold">${request.priceUsd}</Tag>
+          )}
         </p>
-        {typeof request.tokens === "number" && <p className="mt-0.5 text-xs text-raw-silver/60">{request.tokens} tokens</p>}
-        {request.reasons.length > 0 && <p className="mt-0.5 text-xs text-raw-silver/60">{request.reasons.join(", ")}</p>}
-        {request.note && <p className="mt-0.5 text-xs text-raw-silver/60">{request.note}</p>}
-        <p className="mt-1 text-[10px] text-raw-silver/35">{formatDate(request.createdAt)}</p>
+        {typeof request.tokens === "number" && (
+          <p className="mt-0.5 text-xs text-raw-silver/60">
+            {request.tokens} tokens
+          </p>
+        )}
+        {request.reasons.length > 0 && (
+          <p className="mt-0.5 text-xs text-raw-silver/60">
+            {request.reasons.join(", ")}
+          </p>
+        )}
+        {request.note && (
+          <p className="mt-0.5 text-xs text-raw-silver/60">{request.note}</p>
+        )}
+        <p className="mt-1 text-[10px] text-raw-silver/35">
+          {formatDate(request.createdAt)}
+        </p>
       </div>
       {canReview && (
         <div className="flex gap-2">
@@ -159,10 +243,19 @@ function TokenRequestRow({
             value={tokenAmount}
             onChange={(event) => setTokenAmount(Number(event.target.value))}
           />
-          <AdminButton tone="teal" disabled={!validAmount} onClick={() => void onReview(request.id, "approved", tokenAmount)}>
+          <AdminButton
+            tone="teal"
+            disabled={!validAmount}
+            onClick={() => void onReview(request.id, "approved", tokenAmount)}
+          >
             Approve
           </AdminButton>
-          <AdminButton tone="danger" onClick={() => void onReview(request.id, "rejected")}>Reject</AdminButton>
+          <AdminButton
+            tone="danger"
+            onClick={() => void onReview(request.id, "rejected")}
+          >
+            Reject
+          </AdminButton>
         </div>
       )}
     </Row>
